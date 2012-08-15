@@ -9,7 +9,6 @@ use lib "$Bin/lib";
 use Test::More 0.96;
 
 use Perinci::Access::InProcess;
-use Scalar::Util qw(blessed);
 
 my $pa_cached;
 my $pa;
