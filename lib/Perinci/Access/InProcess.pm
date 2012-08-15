@@ -365,7 +365,7 @@ sub action_call {
     my $res;
 
     my $tm; # = does client mention tx_id?
-    if ($req->{tx_id}) {
+    if (defined $req->{tx_id}) {
         $res = $self->_pre_tx_action($req);
         return $res if $res;
         $tm = $self->{_tx_manager};
@@ -383,9 +383,9 @@ sub action_call {
 
     # even if client doesn't mention tx_id, some function still needs
     # -undo_trash_dir under dry_run for testing (e.g. setup_symlink()).
-    if (!$tm && $ftx && $dry && !$args{-undo_trash_dir}) {
-        if ($self->{_tx_manager}) {
-            $res = $self->{_tx_manager}->get_trash_dir;
+    if (!defined($req->{tx_id}) && $ftx && $dry && !$args{-undo_trash_dir}) {
+        if ($tm) {
+            $res = $tm->get_trash_dir;
             $args{-undo_trash_dir} = $res->[2]; # XXX if error?
         } else {
             $args{-undo_trash_dir} = "/tmp"; # TMP
@@ -393,38 +393,11 @@ sub action_call {
     }
 
     if ($tm) {
-
-        # if function features does not qualify in transaction, this constitutes
-        # an error and should cause a rollback
-        unless (
-            ($ftx && $ff->{undo} && $ff->{idempotent}) ||
-                $ff->{pure} ||
-                    ($ff->{dry_run} && $args{-dry_run})) {
-            my $rbres = $tm->rollback;
-            return [412, "Can't call this function using transaction".
-                        ($rbres->[0] == 200 ?
-                             " (rollbacked)" : " (rollback failed)")];
-        }
-        $args{-tx_manager} = $tm;
-        $args{-undo_action} //= 'do' if $ftx;
+        $res = $tm->call(f => "$req->{-module}::$req->{-leaf}", args=>\%args);
+        $tm->{_tx_id} = undef if $tm;
+    } else {
+        $res = $code->(%args);
     }
-
-    $res = $code->(%args);
-
-    if ($tm) {
-        if ($res->[0] =~ /^(?:200|304)$/) {
-            # suppress undo_data from function, as per Riap::Tx spec
-            delete $res->[3]{undo_data} if $res->[3];
-        } else {
-            # if function returns non-success, this also constitutes an error in
-            # transaction and should cause a rollback
-            my $rbres = $tm->rollback;
-            $res->[1] .= $rbres->[0] == 200 ?
-                " (rollbacked)" : " (rollback failed)";
-        }
-    }
-
-    $tm->{_tx_id} = undef if $tm;
 
     $res;
 }
@@ -570,6 +543,11 @@ sub _pre_tx_action {
             die $self->{_tx_manager} unless blessed($self->{_tx_manager});
         };
         return [500, "Can't initialize tx manager ($tm_cl): $@"] if $@;
+        if ($tm_cl eq 'Perinci::Tx::Manager') {
+            $Perinci::Tx::Manager::VERSION >= 0.29
+                or die "Your Perinci::Tx::Manager is too old, ".
+                    "please install v0.29 or later";
+        }
     }
 
     return;
