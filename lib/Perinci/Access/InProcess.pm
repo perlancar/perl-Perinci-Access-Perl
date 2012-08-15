@@ -364,12 +364,12 @@ sub action_call {
 
     my $res;
 
-    my $tx; # = does client mention tx_id?
+    my $tm; # = does client mention tx_id?
     if ($req->{tx_id}) {
         $res = $self->_pre_tx_action($req);
         return $res if $res;
-        $tx = $self->{_tx};
-        $tx->{_tx_id} = $req->{tx_id};
+        $tm = $self->{_tx_manager};
+        $tm->{_tx_id} = $req->{tx_id};
     }
 
     $res = $self->_get_code_and_meta($req);
@@ -383,16 +383,16 @@ sub action_call {
 
     # even if client doesn't mention tx_id, some function still needs
     # -undo_trash_dir under dry_run for testing (e.g. setup_symlink()).
-    if (!$tx && $ftx && $dry && !$args{-undo_trash_dir}) {
-        if ($self->{_tx}) {
-            $res = $self->{_tx}->get_trash_dir;
+    if (!$tm && $ftx && $dry && !$args{-undo_trash_dir}) {
+        if ($self->{_tx_manager}) {
+            $res = $self->{_tx_manager}->get_trash_dir;
             $args{-undo_trash_dir} = $res->[2]; # XXX if error?
         } else {
             $args{-undo_trash_dir} = "/tmp"; # TMP
         }
     }
 
-    if ($tx) {
+    if ($tm) {
 
         # if function features does not qualify in transaction, this constitutes
         # an error and should cause a rollback
@@ -400,31 +400,31 @@ sub action_call {
             ($ftx && $ff->{undo} && $ff->{idempotent}) ||
                 $ff->{pure} ||
                     ($ff->{dry_run} && $args{-dry_run})) {
-            my $rbres = $tx->rollback;
+            my $rbres = $tm->rollback;
             return [412, "Can't call this function using transaction".
                         ($rbres->[0] == 200 ?
                              " (rollbacked)" : " (rollback failed)")];
         }
-        $args{-tx_manager} = $tx;
+        $args{-tx_manager} = $tm;
         $args{-undo_action} //= 'do' if $ftx;
     }
 
     $res = $code->(%args);
 
-    if ($tx) {
+    if ($tm) {
         if ($res->[0] =~ /^(?:200|304)$/) {
             # suppress undo_data from function, as per Riap::Tx spec
             delete $res->[3]{undo_data} if $res->[3];
         } else {
             # if function returns non-success, this also constitutes an error in
             # transaction and should cause a rollback
-            my $rbres = $tx->rollback;
+            my $rbres = $tm->rollback;
             $res->[1] .= $rbres->[0] == 200 ?
                 " (rollbacked)" : " (rollback failed)";
         }
     }
 
-    $tx->{_tx_id} = undef if $tx;
+    $tm->{_tx_id} = undef if $tm;
 
     $res;
 }
@@ -556,20 +556,20 @@ sub _pre_tx_action {
     # instantiate custom tx manager, per request if necessary
     if ((reftype($self->{custom_tx_manager}) // '') eq 'CODE') {
         eval {
-            $self->{_tx} = $self->{custom_tx_manager}->($self);
-            die $self->{_tx} unless blessed($self->{_tx});
+            $self->{_tx_manager} = $self->{custom_tx_manager}->($self);
+            die $self->{_tx_manager} unless blessed($self->{_tx_manager});
         };
-        return [500, "Can't initialize custom tx manager: $self->{_tx}: $@"]
-            if $@;
-    } elsif (!blessed($self->{_tx})) {
-        my $txm_cl = $self->{custom_tx_manager} // "Perinci::Tx::Manager";
-        my $txm_cl_p = $txm_cl; $txm_cl_p =~ s!::!/!g; $txm_cl_p .= ".pm";
+        return [500, "Can't initialize custom tx manager: ".
+                    "$self->{_tx_manager}: $@"] if $@;
+    } elsif (!blessed($self->{_tx_manager})) {
+        my $tm_cl = $self->{custom_tx_manager} // "Perinci::Tx::Manager";
+        my $tm_cl_p = $tm_cl; $tm_cl_p =~ s!::!/!g; $tm_cl_p .= ".pm";
         eval {
-            require $txm_cl_p;
-            $self->{_tx} = $txm_cl->new(pa => $self);
-            die $self->{_tx} unless blessed($self->{_tx});
+            require $tm_cl_p;
+            $self->{_tx_manager} = $tm_cl->new(pa => $self);
+            die $self->{_tx_manager} unless blessed($self->{_tx_manager});
         };
-        return [500, "Can't initialize tx manager ($txm_cl): $@"] if $@;
+        return [500, "Can't initialize tx manager ($tm_cl): $@"] if $@;
     }
 
     return;
@@ -585,7 +585,7 @@ sub action_begin_tx {
     my $res = $self->_pre_tx_action($req);
     return $res if $res;
 
-    $self->{_tx}->begin(
+    $self->{_tx_manager}->begin(
         tx_id   => $req->{tx_id},
         summary => $req->{summary},
     );
@@ -601,7 +601,7 @@ sub action_commit_tx {
     my $res = $self->_pre_tx_action($req);
     return $res if $res;
 
-    $self->{_tx}->commit(
+    $self->{_tx_manager}->commit(
         tx_id  => $req->{tx_id},
     );
 }
@@ -616,7 +616,7 @@ sub action_savepoint_tx {
     my $res = $self->_pre_tx_action($req);
     return $res if $res;
 
-    $self->{_tx}->savepoint(
+    $self->{_tx_manager}->savepoint(
         tx_id => $req->{tx_id},
         sp    => $req->{tx_spid},
     );
@@ -632,7 +632,7 @@ sub action_release_tx_savepoint {
     my $res = $self->_pre_tx_action($req);
     return $res if $res;
 
-    $self->{_tx}->release_savepoint(
+    $self->{_tx_manager}->release_savepoint(
         tx_id => $req->{tx_id},
         sp    => $req->{tx_spid},
     );
@@ -648,7 +648,7 @@ sub action_rollback_tx {
     my $res = $self->_pre_tx_action($req);
     return $res if $res;
 
-    $self->{_tx}->rollback(
+    $self->{_tx_manager}->rollback(
         tx_id => $req->{tx_id},
         sp    => $req->{tx_spid},
     );
@@ -664,7 +664,7 @@ sub action_list_txs {
     my $res = $self->_pre_tx_action($req);
     return $res if $res;
 
-    $self->{_tx}->list(
+    $self->{_tx_manager}->list(
         detail    => $req->{detail},
         tx_status => $req->{tx_status},
         tx_id     => $req->{tx_id},
@@ -681,7 +681,7 @@ sub action_undo {
     my $res = $self->_pre_tx_action($req);
     return $res if $res;
 
-    $self->{_tx}->undo(
+    $self->{_tx_manager}->undo(
         tx_id => $req->{tx_id},
     );
 }
@@ -696,7 +696,7 @@ sub action_redo {
     my $res = $self->_pre_tx_action($req);
     return $res if $res;
 
-    $self->{_tx}->redo(
+    $self->{_tx_manager}->redo(
         tx_id => $req->{tx_id},
     );
 }
@@ -711,7 +711,7 @@ sub action_discard_tx {
     my $res = $self->_pre_tx_action($req);
     return $res if $res;
 
-    $self->{_tx}->discard(
+    $self->{_tx_manager}->discard(
         tx_id => $req->{tx_id},
     );
 }
@@ -726,7 +726,7 @@ sub action_discard_all_txs {
     my $res = $self->_pre_tx_action($req);
     return $res if $res;
 
-    $self->{_tx}->discard_all(
+    $self->{_tx_manager}->discard_all(
         # XXX select client
     );
 }
