@@ -885,6 +885,9 @@ Some applications of this include: changing C<default_lang> of metadata.
 Whether to allow transaction requests from client. Since this can cause the
 server to store transaction/undo data, this must be explicitly allowed.
 
+You need to install L<Perinci::Tx::Manager> for transaction support (unless you
+are using another transaction manager).
+
 =item * custom_tx_manager => STR|CODE
 
 Can be set to a string (class name) or a code that is expected to return a
@@ -892,11 +895,10 @@ transaction manager class.
 
 By default, L<Perinci::Tx::Manager> is instantiated and maintained (not
 reinstantiated on every request), but if C<custom_tx_manager> is a coderef, it
-will be called on each request to get transaction manager.
-
-This can be used to instantiate L<Perinci::Tx::Manager> in a custom way, e.g.
-specifying per-user transaction data directory and limits, which needs to be
-done on a per-request basis.
+will be called on each request to get transaction manager. This can be used to
+instantiate Perinci::Tx::Manager in a custom way, e.g. specifying per-user
+transaction data directory and limits, which needs to be done on a per-request
+basis.
 
 =back
 
