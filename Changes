@@ -1,5 +1,12 @@
 Revision history for Perinci-Access-InProcess
 
+0.29     2012-08-16 (SHARYANTO)
+
+         Adjust to Rinci 1.1.23 and Perinci::Tx::Manager 0.22. No longer list
+         Perinci::Tx::Manager as dependency. Move transaction tests to
+         Perinci-Tx-Manager distribution.
+
+
 0.28     2012-08-10 (SHARYANTO)
 
          First release, split to make Perinci dist empty (that dist was a
