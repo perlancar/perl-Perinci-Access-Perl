@@ -1,5 +1,12 @@
 Revision history for Perinci-Access-InProcess
 
+0.30     2012-08-22 (SHARYANTO)
+
+         Adjust to Rinci 1.1.25. No longer check transaction support of
+         functions (we'll just let TM do that). No longer provide
+         -undo_trash_dir to function to simplify things.
+
+
 0.29     2012-08-16 (SHARYANTO)
 
          Adjust to Rinci 1.1.23 and Perinci::Tx::Manager 0.22. No longer list
