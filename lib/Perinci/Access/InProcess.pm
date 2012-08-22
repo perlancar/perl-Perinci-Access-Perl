@@ -377,21 +377,6 @@ sub action_call {
     my ($code, $meta) = @{$res->[2]};
     my %args = %{ $req->{args} // {} };
 
-    my $ff  = $meta->{features} // {};
-    my $ftx = $ff->{tx} && ($ff->{tx}{use} || $ff->{tx}{req});
-    my $dry = $ff->{dry_run} && $args{-dry_run};
-
-    # even if client doesn't mention tx_id, some function still needs
-    # -undo_trash_dir under dry_run for testing (e.g. setup_symlink()).
-    if (!defined($req->{tx_id}) && $ftx && $dry && !$args{-undo_trash_dir}) {
-        if ($tm) {
-            $res = $tm->get_trash_dir;
-            $args{-undo_trash_dir} = $res->[2]; # XXX if error?
-        } else {
-            $args{-undo_trash_dir} = "/tmp"; # TMP
-        }
-    }
-
     if ($tm) {
         $res = $tm->call(f => "$req->{-module}::$req->{-leaf}", args=>\%args);
         $tm->{_tx_id} = undef if $tm;
