@@ -528,6 +528,9 @@ sub _pre_tx_action {
             die $self->{_tx_manager} unless blessed($self->{_tx_manager});
         };
         return [500, "Can't initialize tx manager ($tm_cl): $@"] if $@;
+        # we just want to force newer version, we currently can't specify this
+        # in Makefile.PL because peritm's tests use us. this might be rectified
+        # in the future.
         if ($tm_cl eq 'Perinci::Tx::Manager') {
             $Perinci::Tx::Manager::VERSION >= 0.29
                 or die "Your Perinci::Tx::Manager is too old, ".
