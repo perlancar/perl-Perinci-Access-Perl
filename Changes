@@ -1,5 +1,11 @@
 Revision history for Perinci-Access-InProcess
 
+0.32     2012-08-28 (SHARYANTO)
+
+         Pass confirmation for actions 'undo' and 'redo' too (actually those are
+         the important ones).
+
+
 0.31     2012-08-28 (SHARYANTO)
 
          Implement confirmation (Rinci 1.1.27). Pass Riap request key 'confirm'
