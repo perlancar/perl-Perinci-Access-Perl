@@ -378,9 +378,13 @@ sub action_call {
     my %args = %{ $req->{args} // {} };
 
     if ($tm) {
-        $res = $tm->call(f => "$req->{-module}::$req->{-leaf}", args=>\%args);
+        $res = $tm->action(
+            f => "$req->{-module}::$req->{-leaf}", args=>\%args,
+            confirm => $req->{confirm},
+        );
         $tm->{_tx_id} = undef if $tm;
     } else {
+        $args{-confirm} = 1 if $req->{confirm};
         $res = $code->(%args);
     }
 
