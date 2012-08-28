@@ -652,7 +652,8 @@ sub action_undo {
     return $res if $res;
 
     $self->{_tx_manager}->undo(
-        tx_id => $req->{tx_id},
+        tx_id   => $req->{tx_id},
+        confirm => $req->{confirm},
     );
 }
 
@@ -667,7 +668,8 @@ sub action_redo {
     return $res if $res;
 
     $self->{_tx_manager}->redo(
-        tx_id => $req->{tx_id},
+        tx_id   => $req->{tx_id},
+        confirm => $req->{confirm},
     );
 }
 
