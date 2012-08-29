@@ -386,6 +386,7 @@ sub action_call {
         if ($risub->feature('dry_run')) {
             $args{-dry_run} = 1;
         } else {
+            $args{-dry_run} = 1;
             $args{-tx_action} = 'check_state';
             $args{-tx_action_id} = UUID::Random::generate();
             undef $tm;
