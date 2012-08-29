@@ -12,6 +12,7 @@ use Perinci::Util qw(get_package_meta_accessor);
 use Scalar::Util qw(blessed reftype);
 use SHARYANTO::Package::Util qw(package_exists);
 use URI;
+use UUID::Random;
 
 # VERSION
 
@@ -386,6 +387,7 @@ sub action_call {
             $args{-dry_run} = 1;
         } else {
             $args{-tx_action} = 'check_state';
+            $args{-tx_action_id} = UUID::Random::generate();
             undef $tm;
         }
     }
