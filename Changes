@@ -1,5 +1,11 @@
 Revision history for Perinci-Access-InProcess
 
+0.35     2012-08-29 (SHARYANTO)
+
+         - Pass -dry_run => 1 to tx function in dry run mode, so the function
+           can detect dry run mode (and, say, display messages).
+
+
 0.34     2012-08-29 (SHARYANTO)
 
          - Support '-tx_action_id' to tx function in dry run mode (Rinci
