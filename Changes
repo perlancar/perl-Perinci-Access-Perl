@@ -1,5 +1,11 @@
 Revision history for Perinci-Access-InProcess
 
+0.34     2012-08-29 (SHARYANTO)
+
+         - Support '-tx_action_id' to tx function in dry run mode (Rinci
+           1.1.28).
+
+
 0.33     2012-08-29 (SHARYANTO)
 
          - Support 'dry_run' in call action (Riap 1.1.19).
