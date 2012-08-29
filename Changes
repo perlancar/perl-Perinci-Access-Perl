@@ -1,5 +1,10 @@
 Revision history for Perinci-Access-InProcess
 
+0.33     2012-08-29 (SHARYANTO)
+
+         - Support 'dry_run' in call action (Riap 1.1.19).
+
+
 0.32     2012-08-28 (SHARYANTO)
 
          Pass confirmation for actions 'undo' and 'redo' too (actually those are
