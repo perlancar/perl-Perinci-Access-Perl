@@ -7,6 +7,7 @@ use Log::Any '$log';
 
 use parent qw(Perinci::Access::Base);
 
+use Perinci::Object;
 use Perinci::Util qw(get_package_meta_accessor);
 use Scalar::Util qw(blessed reftype);
 use SHARYANTO::Package::Util qw(package_exists);
@@ -376,6 +377,18 @@ sub action_call {
     return $res unless $res->[0] == 200;
     my ($code, $meta) = @{$res->[2]};
     my %args = %{ $req->{args} // {} };
+
+    if ($req->{dry_run}) {
+        my $risub = risub($meta);
+        return [412, "Function does not support dry run"]
+            unless $risub->can_dry_run;
+        if ($risub->feature('dry_run')) {
+            $args{-dry_run} = 1;
+        } else {
+            $args{-tx_action} = 'check_state';
+            undef $tm;
+        }
+    }
 
     if ($tm) {
         $res = $tm->action(
@@ -795,8 +808,7 @@ get a consistent interface.
 
 =item * Transaction/undo
 
-This class implements L<Riap::Transaction>. See
-L<Perinci::Access::InProcess::Tx> for more details.
+This class implements L<Riap::Transaction>.
 
 =back
 

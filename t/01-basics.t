@@ -43,6 +43,25 @@ sub f1 { [200, "OK", 2] }
 $SPEC{f2} = {v=>1.1};
 sub f2 { [200, "OK", 3] }
 
+$SPEC{req_confirm} = {v=>1.1};
+sub req_confirm {
+    my %args = @_;
+    return [331, "Confirmation required"] unless $args{-confirm};
+    [200, "OK"];
+}
+
+$SPEC{dry_run} = {v=>1.1, features=>{dry_run=>1}};
+sub dry_run {
+    my %args = @_;
+    [200, "OK", $args{-dry_run} ? 1:2];
+}
+
+$SPEC{tx} = {v=>1.1, features=>{tx=>{v=>2}, idempotent=>1}};
+sub tx {
+    my %args = @_;
+    [200, "OK", $args{-tx_action} eq 'check_state' ? 1:2];
+}
+
 package main;
 
 # test after_load first, for first time loading of
@@ -185,6 +204,54 @@ test_request(
 # XXX call: invalid args
 
 test_request(
+    name => 'call: confirm (w/o)',
+    req => [call => "/Test/Perinci/Access/InProcess/req_confirm",
+            {}],
+    status => 331,
+);
+test_request(
+    name => 'call: confirm (w/)',
+    req => [call => "/Test/Perinci/Access/InProcess/req_confirm",
+            {confirm=>1}],
+    status => 200,
+);
+
+test_request(
+    name => 'call: dry_run to function that cannot do dry run -> 412',
+    req => [call => "/Test/Perinci/Access/InProcess/f1",
+            {dry_run=>1}],
+    status => 412,
+);
+test_request(
+    name => 'call: dry_run (using dry_run) (w/o)',
+    req => [call => "/Test/Perinci/Access/InProcess/dry_run",
+            {}],
+    status => 200,
+    result => 2,
+);
+test_request(
+    name => 'call: dry_run (using dry_run) (w/)',
+    req => [call => "/Test/Perinci/Access/InProcess/dry_run",
+            {dry_run=>1}],
+    status => 200,
+    result => 1,
+);
+test_request(
+    name => 'call: dry_run (using tx) (w/o)',
+    req => [call => "/Test/Perinci/Access/InProcess/tx",
+            {}],
+    status => 200,
+    result => 2,
+);
+test_request(
+    name => 'call: dry_run (using tx) (w/)',
+    req => [call => "/Test/Perinci/Access/InProcess/tx",
+            {dry_run=>1}],
+    status => 200,
+    result => 1,
+);
+
+test_request(
     name => 'complete_arg_val: missing arg',
     req => [complete_arg_val => "/Perinci/Examples/test_completion", {}],
     status => 400,
@@ -287,6 +354,26 @@ test_request(
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,
                 entity_version=>1.2,
+            },
+        'pl:/Test/Perinci/Access/InProcess/req_confirm' =>
+            {
+                v=>1.1,
+                args_as => 'hash', result_naked => 0,
+                entity_version=>1.2,
+            },
+        'pl:/Test/Perinci/Access/InProcess/dry_run' =>
+            {
+                v=>1.1,
+                args_as => 'hash', result_naked => 0,
+                entity_version=>1.2,
+                features => {dry_run=>1},
+            },
+        'pl:/Test/Perinci/Access/InProcess/tx' =>
+            {
+                v=>1.1,
+                args_as => 'hash', result_naked => 0,
+                entity_version=>1.2,
+                features => {tx=>{v=>2}, idempotent=>1},
             },
     },
 );
