@@ -379,8 +379,9 @@ sub action_call {
     my ($code, $meta) = @{$res->[2]};
     my %args = %{ $req->{args} // {} };
 
+    my $risub = risub($meta);
+
     if ($req->{dry_run}) {
-        my $risub = risub($meta);
         return [412, "Function does not support dry run"]
             unless $risub->can_dry_run;
         if ($risub->feature('dry_run')) {
@@ -391,6 +392,11 @@ sub action_call {
             $args{-tx_action_id} = UUID::Random::generate();
             undef $tm;
         }
+    }
+
+    if ($risub->feature('progress')) {
+        require Progress::Any;
+        $args{-progress} = Progress::Any->get_indicator();
     }
 
     if ($tm) {
@@ -795,7 +801,8 @@ already accessible from Perl like functions and metadata (in C<%SPEC>). Indeed,
 if you do not need Riap, you can access your module just like any normal Perl
 module.
 
-But Perinci::Access::InProcess offers several benefits:
+But Perinci::Access::InProcess (called B<periai> for short) offers several
+benefits:
 
 =over 4
 
@@ -833,6 +840,19 @@ The default accessor class is L<Perinci::MetaAccessor::Default>. Alternatively,
 you can simply devise your own system to retrieve metadata which you can put in
 C<%SPEC> at the end.
 
+=head2 Progress indicator
+
+periai can also display progress indicator for function that does progress
+updating. Function expresses that it does progress updating through the
+C<features> property in its metadata:
+
+ features => {
+     progress => 1,
+     ...
+ }
+
+periai will then pass a special argument C<-progress> containing
+L<Progress::Any> object.
 
 =head1 METHODS
 

@@ -62,6 +62,21 @@ sub tx {
     [200, "OK", $args{-tx_action} eq 'check_state' ? 1:2];
 }
 
+package Test::Perinci::Access::InProcess2;
+our %SPEC;
+
+$SPEC{no_progress} = {v=>1.1};
+sub no_progress {
+    my %args = @_;
+    $args{-progress} ? [200, "OK"] : [500, "No -progress passed"];
+}
+
+$SPEC{has_progress} = {v=>1.1, features=>{progress=>1}};
+sub has_progress {
+    my %args = @_;
+    $args{-progress} ? [200, "OK"] : [500, "No -progress passed"];
+}
+
 package main;
 
 # test after_load first, for first time loading of
@@ -405,6 +420,17 @@ test_request(
            "default_lang convert passed to wrapper (2)")
             or diag explain $res;
     },
+);
+
+test_request(
+    name => 'no progress',
+    req => [call => "/Test/Perinci/Access/InProcess2/no_progress", {}],
+    status => 500,
+);
+test_request(
+    name => 'has progress',
+    req => [call => "/Test/Perinci/Access/InProcess2/has_progress", {}],
+    status => 200,
 );
 
 DONE_TESTING:
