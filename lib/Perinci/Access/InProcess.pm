@@ -23,7 +23,6 @@ our $re_mod = qr/\A[A-Za-z_][A-Za-z_0-9]*(::[A-Za-z_][A-Za-z_0-9]*)*\z/;
 
 sub _init {
     require Class::Inspector;
-    require Tie::Cache;
 
     my ($self) = @_;
 
@@ -53,18 +52,22 @@ sub _init {
     }
     $self->{_typeacts} = \%typeacts;
 
-    # to cache wrapped result
-    tie my(%cache), 'Tie::Cache', 100;
-    $self->{_cache} = \%cache;
-
+    $self->{cache_size}            //= 100;
     $self->{use_tx}                //= 0;
     $self->{custom_tx_manager}     //= undef;
-
-    # other attributes
     $self->{meta_accessor} //= "Perinci::MetaAccessor::Default";
     $self->{load}                  //= 1;
     $self->{extra_wrapper_args}    //= {};
     $self->{extra_wrapper_convert} //= {};
+
+    # to cache wrapped result
+    if ($self->{cache_size}) {
+        require Tie::Cache;
+        tie my(%cache), 'Tie::Cache', $self->{cache_size};
+        $self->{_cache} = \%cache;
+    } else {
+        $self->{_cache} = {};
+    }
 }
 
 sub _get_meta_accessor {
@@ -122,7 +125,8 @@ sub _get_code_and_meta {
             },
         };
         $meta = $wres->[2]{meta};
-        $self->{_cache}{$name} = [$code, $meta, $extra];
+        $self->{_cache}{$name} = [$code, $meta, $extra]
+            if $self->{cache_size};
     }
     unless (defined $meta->{entity_version}) {
         my $ver = ${ $req->{-module} . "::VERSION" };
@@ -867,6 +871,12 @@ Instantiate object. Known attributes:
 =item * load => BOOL (default 1)
 
 Whether attempt to load modules using C<require>.
+
+=item * cache_size => INT (default: 100)
+
+Specify cache size (in number of items). Cache saves the result of function
+wrapping so future requests to the same function need not involve wrapping
+again. Setting this to 0 disables caching.
 
 =item * after_load => CODE
 
