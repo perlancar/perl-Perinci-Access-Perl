@@ -1,5 +1,12 @@
 Revision history for Perinci-Access-InProcess
 
+0.37     2012-10-31 (SHARYANTO)
+
+         - Add option: cache_size (to make it possible to disable caching).
+
+         - Update to Perinci::Sub::Wrapper 0.33.
+
+
 0.36     2012-10-24 (SHARYANTO)
 
          - Pass -progress special argument containing Progress::Any object to
