@@ -77,6 +77,9 @@ sub has_progress {
     $args{-progress} ? [200, "OK"] : [500, "No -progress passed"];
 }
 
+$SPEC{test_uws} = {v=>1.1, args=>{a=>{}}};
+sub test_uws { [200] }
+
 package main;
 
 # test after_load first, for first time loading of
@@ -432,6 +435,28 @@ test_request(
     req => [call => "/Test/Perinci/Access/InProcess2/has_progress", {}],
     status => 200,
 );
+
+test_request(
+    name => 'opt: use_wrapped_sub=0',
+    object_opts=>{use_wrapped_sub=>0},
+    req => [call => '/Test/Perinci/Access/InProcess2/test_uws', {args=>{x=>1}}],
+    status => 200,
+);
+test_request(
+    name => 'opt: use_wrapped_sub=1 (the default)',
+    object_opts=>{},
+    req => [call => '/Test/Perinci/Access/InProcess2/test_uws', {args=>{x=>1}}],
+    status => 400,
+);
+{
+    local $Test::Perinci::Access::InProcess2::SPEC{test_uws}{"_perinci.access.inprocess.use_wrapped_sub"} = 0;
+    test_request(
+        name => '_perinci.access.inprocess.use_wrapped_sub=0',
+        object_opts=>{},
+        req => [call => '/Test/Perinci/Access/InProcess2/test_uws', {args=>{x=>1}}],
+        status => 200,
+    );
+}
 
 DONE_TESTING:
 done_testing();
