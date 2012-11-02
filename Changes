@@ -1,5 +1,12 @@
 Revision history for Perinci-Access-InProcess
 
+0.38     2012-11-02 (SHARYANTO)
+
+         - Add option: use_wrapped_sub (to make it possible to use call original
+           sub instead of wrapped version). Can also be set using
+           _perinci.access.inprocess.use_wrapped_sub in metadata.
+
+
 0.37     2012-10-31 (SHARYANTO)
 
          - Add option: cache_size (to make it possible to disable caching).
