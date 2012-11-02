@@ -114,7 +114,10 @@ sub _get_code_and_meta {
             });
         return [500, "Can't wrap function: $wres->[0] - $wres->[1]"]
             unless $wres->[0] == 200;
-        $code = $wres->[2]{sub};
+        if ($self->{use_wrapped_sub} //
+                $meta->{"_perinci.access.inprocess.use_wrapped_sub"} // 1) {
+            $code = $wres->[2]{sub};
+        }
 
         $extra = {
             # store some info about the old meta, no need to store all for
@@ -882,6 +885,17 @@ again. Setting this to 0 disables caching.
 
 If set, code will be executed the first time Perl module is successfully loaded.
 
+=item * use_wrapped_sub => BOOL (default: 1)
+
+If set to false, then wil use original subroutine instead of wrapped one, for
+example if you are very concerned about performance (do not want to add another
+eval {} and subroutine call introduced by wrapping) or do not need the
+functionality provided by the wrapper (e.g. your function does not die and
+already validates its arguments, etc).
+
+Can also be set on a per-entity basis by setting the
+C<_perinci.access.inprocess.use_wrapped_sub> metadata property.
+
 =item * extra_wrapper_args => HASH
 
 If set, will be passed to L<Perinci::Sub::Wrapper>'s wrap_sub() when wrapping
@@ -937,6 +951,20 @@ by L<Perinci::Sub::Wrapper>.
 
 
 =head1 FAQ
+
+=head2 Why wrap?
+
+The wrapping process accomplishes several things, among others: checking of
+metadata, normalization of schemas in metadata, also argument validation and
+exception trapping in function.
+
+The function wrapping introduces a small overhead when performing a sub call
+(typically around several to tens of microseconds on an Intel Core i5 1.7GHz
+notebook). This is usually smaller than the overhead of
+Perinci::Access::InProcess itself (typically in the range of 100 microseconds).
+But if you are concerned about the wrapping overhead, see the C<use_wrapped_sub>
+option.
+
 
 =head2 Why %SPEC?
 
