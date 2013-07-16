@@ -1,5 +1,13 @@
 Revision history for Perinci-Access-InProcess
 
+0.39     2012-11-02 (SHARYANTO)
+
+         [BUG FIXES]
+
+         - 'list' action didn't work (fails to list subpackages) when requested
+           module does not exist.
+
+
 0.38     2012-11-02 (SHARYANTO)
 
          - Add option: use_wrapped_sub (to make it possible to use call original
