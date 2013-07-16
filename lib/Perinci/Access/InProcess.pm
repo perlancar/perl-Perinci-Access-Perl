@@ -192,7 +192,7 @@ sub request {
     $req->{-leaf}    = $leaf;
     $req->{-module}  = $module;
 
-    my $module_missing;
+    my $module_load_err;
     if ($module) {
         my $module_p = $module;
         $module_p =~ s!::!/!g;
@@ -202,13 +202,15 @@ sub request {
         if ($self->{load}) {
             unless ($INC{$module_p}) {
                 eval { require $module_p };
-                my $req_err = $@;
-                if ($req_err) {
-                    if (!package_exists($module)) {
-                        $module_missing = $req_err;
-                    } elsif ($req_err !~ m!Can't locate!) {
-                        return [500, "Can't load module $module (probably ".
-                                    "compile error): $req_err"];
+                $module_load_err = $@;
+                if ($module_load_err) {
+                    if (!package_exists($module) ||
+                            $module_load_err !~ m!Can't locate!) {
+                        unless ($self->{_metas}{$action}{module_missing_ok}) {
+                            return [500, "Can't load module $module (probably ".
+                                        "missing or compile error): ".
+                                            $module_load_err];
+                        }
                     }
                     # require error of "Can't locate ..." can be ignored. it
                     # might mean package is already defined by other code. we'll
@@ -252,12 +254,6 @@ sub request {
     return [502, "Action '$action' not implemented for ".
                 "'$req->{-type}' entity"]
         unless $self->{_typeacts}{ $req->{-type} }{ $action };
-
-    if ($module_missing) {
-        return [500, "Can't load module $module (probably ".
-                    "mistyped or missing module): $module_missing"]
-            unless $self->{_metas}{$action}{module_missing_ok};
-    }
 
     # check transaction
     $self->$meth($req);
