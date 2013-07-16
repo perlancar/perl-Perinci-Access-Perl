@@ -33,11 +33,15 @@ sub _init {
         variable => [],
     ); # key = type, val = [[ACTION, META], ...]
 
+    # cache, so we can save a method call for every request()
+    $self->{_metas} = {}; # key = act
+
     my @comacts;
     for my $meth (@{Class::Inspector->methods(ref $self)}) {
         next unless $meth =~ /^actionmeta_(.+)/;
         my $act = $1;
         my $meta = $self->$meth();
+        $self->{_metas}{$act} = $meta;
         for my $type (@{$meta->{applies_to}}) {
             if ($type eq '*') {
                 push @comacts, [$act, $meta];
@@ -188,6 +192,7 @@ sub request {
     $req->{-leaf}    = $leaf;
     $req->{-module}  = $module;
 
+    my $module_missing;
     if ($module) {
         my $module_p = $module;
         $module_p =~ s!::!/!g;
@@ -200,8 +205,7 @@ sub request {
                 my $req_err = $@;
                 if ($req_err) {
                     if (!package_exists($module)) {
-                        return [500, "Can't load module $module (probably ".
-                                    "mistyped or missing module): $req_err"];
+                        $module_missing = $req_err;
                     } elsif ($req_err !~ m!Can't locate!) {
                         return [500, "Can't load module $module (probably ".
                                     "compile error): $req_err"];
@@ -249,9 +253,13 @@ sub request {
                 "'$req->{-type}' entity"]
         unless $self->{_typeacts}{ $req->{-type} }{ $action };
 
-    # check transaction
+    if ($module_missing) {
+        return [500, "Can't load module $module (probably ".
+                    "mistyped or missing module): $module_missing"]
+            unless $self->{_metas}{$action}{module_missing_ok};
+    }
 
-    my $mmeth = "actionmeta_$action";
+    # check transaction
     $self->$meth($req);
 }
 
@@ -294,6 +302,7 @@ sub action_actions {
 sub actionmeta_list { +{
     applies_to => ['package'],
     summary    => "List code entities inside this package code entity",
+    module_missing_ok => 1,
 } }
 
 sub action_list {
