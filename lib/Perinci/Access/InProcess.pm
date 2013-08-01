@@ -239,7 +239,7 @@ sub request {
             # XXX check existence of variable
             $type = 'variable';
         } else {
-            return [404, "Can't find function $leaf in $module"]
+            return [404, "Can't find function $leaf in module $module"]
                 unless defined &{"$module\::$leaf"};
             $type = 'function';
         }
@@ -440,7 +440,7 @@ sub action_complete_arg_val {
     return $res unless $res->[0] == 200;
     my (undef, $meta) = @{$res->[2]};
     my $args_p = $meta->{args} // {};
-    my $arg_p = $args_p->{$arg} or return [404, "No such function arg"];
+    my $arg_p = $args_p->{$arg} or return [400, "Unknown function arg '$arg'"];
 
     my $words;
     eval { # completion sub can die, etc.
