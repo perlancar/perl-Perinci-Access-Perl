@@ -102,7 +102,7 @@ sub _get_code_and_meta {
     if (!$meta && $req->{-type} eq 'package') {
         $meta = {v=>1.1};
     }
-    return [404, "No metadata"] unless $meta;
+    return [404, "No metadata for $name"] unless $meta;
 
     my $code;
     my $extra;
