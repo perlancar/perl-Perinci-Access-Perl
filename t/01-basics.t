@@ -458,6 +458,18 @@ test_request(
     );
 }
 
+subtest "parse_url" => sub {
+    require URI;
+
+    my $pa = Perinci::Access::InProcess->new;
+    is_deeply($pa->parse_url("/Perinci/Examples/"),
+              {proto=>"pl", path=>"/Perinci/Examples/"},
+              "/Perinci/Examples/");
+    is_deeply($pa->parse_url(URI->new("pl:/Perinci/Examples/")),
+              {proto=>"pl", path=>"/Perinci/Examples/"},
+              "/Perinci/Examples/");
+};
+
 DONE_TESTING:
 done_testing();
 
@@ -490,4 +502,3 @@ sub test_request {
         done_testing();
     };
 }
-
