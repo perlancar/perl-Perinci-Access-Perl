@@ -249,7 +249,7 @@ sub request {
 
 sub parse_url {
     my ($self, $uri) = @_;
-    {path=>$uri->path};
+    {proto=>"pl", path=>$uri->path};
 }
 
 sub actionmeta_info { +{
