@@ -1,5 +1,13 @@
 Revision history for Perinci-Access-InProcess
 
+0.40     2013-08-13 (SHARYANTO) (not yet released)
+
+         - Remove dependency on Perinci::Util::get_package_meta_accessor
+           (removed in 0.35).
+
+         - Add parse_url() support.
+
+
 0.39     2012-11-02 (SHARYANTO)
 
          [BUG FIXES]

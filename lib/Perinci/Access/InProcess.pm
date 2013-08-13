@@ -247,6 +247,11 @@ sub request {
     $self->$meth($req);
 }
 
+sub parse_url {
+    my ($self, $uri) = @_;
+    {path=>$uri->path};
+}
+
 sub actionmeta_info { +{
     applies_to => ['*'],
     summary    => "Get general information on code entity",
