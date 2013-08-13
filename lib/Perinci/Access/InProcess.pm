@@ -249,7 +249,7 @@ sub request {
 
 sub parse_url {
     my ($self, $uri) = @_;
-    return [400, "Please specify url"] unless $uri;
+    die "Please specify url" unless $uri;
     $uri = URI->new($uri) unless blessed($uri);
     {proto=>"pl", path=>$uri->path};
 }
