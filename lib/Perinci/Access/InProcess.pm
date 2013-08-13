@@ -934,6 +934,8 @@ by L<Perinci::Sub::Wrapper>.
 
 =back
 
+=head2 $pa->parse_url($server_url) => HASH
+
 
 =head1 FAQ
 

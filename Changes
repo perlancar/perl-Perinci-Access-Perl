@@ -1,6 +1,6 @@
 Revision history for Perinci-Access-InProcess
 
-0.40     2013-08-13 (SHARYANTO) (not yet released)
+0.40     2013-08-13 (SHARYANTO)
 
          - Remove dependency on Perinci::Util::get_package_meta_accessor
            (removed in 0.35).
