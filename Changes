@@ -7,10 +7,21 @@ Revision history for Perinci-Access-InProcess
 
 0.40     2013-08-13 (SHARYANTO)
 
+         [REMOVED FEATURES]
+
          - Remove dependency on Perinci::Util::get_package_meta_accessor
-           (removed in 0.35).
+           (removed in 0.35). Thereby also removing the $PERINCI_META_ACCESSOR
+           feature (this variable in a package can point to another class which
+           tells people how to get the Rinci metadata for said package). This
+           feature is not that useful: we still need to load the module first.
+           There are cases where we might want to lookup metadata (or even map
+           Riap request uri -> Perl package) from the database without loading
+           .pm files. Thus we will rework this class to allow that.
+
+         [ENHANCEMENTS]
 
          - Add parse_url() support.
+
 
 
 0.39     2012-11-02 (SHARYANTO)
