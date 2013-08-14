@@ -61,6 +61,8 @@ sub _init {
     $self->{load}                  //= 1;
     $self->{extra_wrapper_args}    //= {};
     $self->{extra_wrapper_convert} //= {};
+    #$self->{after_load}
+    #$self->{prepend_namespace}
 
     # to cache wrapped result
     if ($self->{cache_size}) {
@@ -132,6 +134,12 @@ sub _get_code_and_meta {
     [200, "OK", [$code, $meta, $extra]];
 }
 
+sub get_package {
+    my ($self, $req) = @_;
+
+    {-path}
+}
+
 sub request {
     no strict 'refs';
 
@@ -149,7 +157,7 @@ sub request {
     $uri = URI->new($uri) unless blessed($uri);
     $req->{uri} = $uri;
 
-    # parse path, package, leaf, module
+    $self->get_package($req);
 
     my $path = $req->{uri}->path || "/";
     $req->{-path} = $path;
@@ -733,7 +741,7 @@ sub action_discard_all_txs {
 1;
 # ABSTRACT: Use Rinci access protocol (Riap) to access Perl code
 
-=for Pod::Coverage ^actionmeta_.+ ^action_.+
+=for Pod::Coverage ^(actionmeta_.+|action_.+|get_(package|meta|code))$
 
 =head1 SYNOPSIS
 
@@ -798,28 +806,40 @@ sub action_discard_all_txs {
 
 =head1 DESCRIPTION
 
-TO REWRITE
-
 This class implements Rinci access protocol (L<Riap>) to access local Perl code.
 This might seem like a long-winded and slow way to access things that are
 already accessible from Perl like functions and metadata (in C<%SPEC>). Indeed,
 if you do not need Riap, you can access your module just like any normal Perl
-module.
-
-But Perinci::Access::InProcess (called B<periai> for short) offers several
-benefits:
+module. But this class is designed to be flexible and allows you to customize
+various aspects (most of the time, without subclassing).
 
 =over 4
 
+=item * Custom mapping from uri to package
+
+By default, code entity's Riap URI maps directly to Perl packages, e.g.
+C</Foo/Bar/> maps to Perl package C<Foo::Bar> while C</Foo/Bar/baz> maps to a
+Perl function C<Foo::Bar::baz>.
+
+You can override C<get_package()> (either by subclassing or by supplying a
+coderef to C<get_package> attribute).
+
 =item * Custom location of metadata
 
-Metadata can be placed not in C<%SPEC> but elsewhere, like in another file or
-even database, or even by merging from several sources.
+By default, metadata are stored embedded in Perl code in C<%SPEC> package
+variables (with keys matching function names, or C<:package> for the package
+metadata itself).
+
+You can override C<get_meta()> (either by subclassing or by supplying a coderef
+to C<get_meta> attribute). For example, you can store metadata in separate file
+or database.
 
 =item * Function wrapping
 
-Can be used to convert argument passing style or produce result envelope, so you
-get a consistent interface.
+Wrapping is used to convert argument passing style, produce result envelope, add
+argument validation, as well as numerous other functionalities. See
+L<Perinci::Sub::Wrapper> for more details on wrapping. The default C<get_code>
+behavior uses wrapping.
 
 =item * Transaction/undo
 
@@ -827,28 +847,48 @@ This class implements L<Riap::Transaction>.
 
 =back
 
-=head2 Location of metadata
+Some other features that periai offers:
 
-By default, the metadata should be put in C<%SPEC> package variable, in a key
-with the same name as the URI path leaf (use C<:package> for the package
-itself). For example, metadata for C</Foo/Bar/$var> should be put in
-C<$Foo::Bar::SPEC{'$var'}>, C</Foo/Bar/> in C<$Foo::Bar::SPEC{':package'}>. The
-metadata for the top-level namespace (C</>) should be put in
-C<$main::SPEC{':package'}>.
+=over
 
-=head2 Progress indicator
+=item * Progress indicator
 
-periai can also display progress indicator for function that does progress
-updating. Function expresses that it does progress updating through the
-C<features> property in its metadata:
+Functions can express that they do progress updating through the C<features>
+property in its metadata:
 
  features => {
      progress => 1,
      ...
  }
 
-periai will then pass a special argument C<-progress> containing
-L<Progress::Any> object.
+For these functions, periai will then pass a special argument C<-progress>
+containing L<Progress::Any> object. Functions can update progress using this
+object.
+
+=back
+
+=head2 How request is processed
+
+User calls C<< $pa->request($action => $uri, \%extras) >>. Internally, the class
+creates a hash C<$req> which contains Riap request keys as well as internal
+information about the Riap request (the latter will be prefixed with dash C<->).
+Initially it will contain C<action> and C<uri> (converted to L<URI> object) and
+the C<%extras> keys from the request() arguments sent by the user.
+
+C<get_package()> will be called. It is expected to set package name C<<
+$req->{-package} >> containing Perl package name, C<< $res->{uri_dir} >>
+containing the "dir" part of the uri and C<< $res->{uri_leaf} >> containing the
+"basename" part of the uri. For example, if uri is C</Foo/Bar/> then C<uri_dir>
+is C</Foo/Bar/> and C<uri_leaf> is an empty string. If uri is C</Foo/Bar/baz>
+then C<uri_dir> is C</Foo/Bar/> while C<uri_leaf> is C<baz>. C<uri_dir> will be
+used for the C<list> action.
+
+Depending on the C<load> setting, the Perl module at C<< $req->{package} >> will
+be require'd if it has not been loaded. If loading is successful and the
+C<after_load> setting is set, the hook will be called.
+
+TOWRITE: get_meta(), get_code() (wrapping, ...), actionmeta_* and action_*
+
 
 =head1 METHODS
 
@@ -858,19 +898,27 @@ Instantiate object. Known attributes:
 
 =over 4
 
-=item * load => BOOL (default 1)
+=item * prepend_namespace => STR
 
-Whether attempt to load modules using C<require>.
+If specified, will prepend this to Perl package names translated from uri Riap
+request key. For example, normally C</Foo/Bar/> maps to Perl package
+C<Foo::Bar>. But if C<prepend_namespace> is set to C<MyCompany::MyProduct>, then
+C</Foo/Bar/> will map to Perl package C<MyCompany::MyProduct::Foo::Bar>.
 
-=item * cache_size => INT (default: 100)
+This setting is only relevant if you use the default C<get_package>.
 
-Specify cache size (in number of items). Cache saves the result of function
-wrapping so future requests to the same function need not involve wrapping
-again. Setting this to 0 disables caching.
+=item * load => BOOL (default: 1)
+
+Whether to load Perl modules that are requested. For example, a request to
+C</Foo/Bar/> will, under the default C<get_package> behavior, map to Perl
+package C<Foo::Bar>. If this setting is on, the Perl module C<Foo::Bar> will be
+attempted to be loaded.
 
 =item * after_load => CODE
 
 If set, code will be executed the first time Perl module is successfully loaded.
+
+This is only relevant if you use the default C<get_package> behavior.
 
 =item * use_wrapped_sub => BOOL (default: 1)
 
@@ -883,20 +931,34 @@ already validates its arguments, etc).
 Can also be set on a per-entity basis by setting the
 C<_perinci.access.inprocess.use_wrapped_sub> metadata property.
 
+This is only relevant if you use the default C<get_code> behavior.
+
+=item * cache_size => INT (default: 100)
+
+Specify cache size (in number of items). Cache saves the result of function
+wrapping so future requests to the same function need not involve wrapping
+again. Setting this to 0 disables caching.
+
+This is only relevant if you enable wrapping and only if you use the default
+C<get_code> behavior.
+
 =item * extra_wrapper_args => HASH
 
 If set, will be passed to L<Perinci::Sub::Wrapper>'s wrap_sub() when wrapping
-subroutines.
+subroutines. Some applications of this include: adding C<timeout> or
+C<result_postfilter> properties to functions.
 
-Some applications of this include: adding C<timeout> or C<result_postfilter>
-properties to functions.
+This is only relevant if you use the default C<get_meta> and C<get_code>
+behavior.
 
 =item * extra_wrapper_convert => HASH
 
 If set, will be passed to L<Perinci::Sub::Wrapper> wrap_sub()'s C<convert>
-argument when wrapping subroutines.
+argument when wrapping subroutines. Some applications of this include: changing
+C<default_lang> of metadata.
 
-Some applications of this include: changing C<default_lang> of metadata.
+This is only relevant if you use the default C<get_meta> and C<get_code>
+behavior.
 
 =item * use_tx => BOOL (default 0)
 
