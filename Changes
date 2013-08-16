@@ -1,5 +1,19 @@
 Revision history for Perinci-Access-InProcess
 
+0.43     2013-08-16 (SHARYANTO) (not yet released)
+
+         [ENHANCEMENTS]
+
+         - Add option: prepend_namespace. This seems to be a common need (e.g.
+           in applications like App::cpanlists::Server, a couple of my projects)
+           so implementing it at the lower-level is convenient instead of having
+           to do URL mangling at PSGI-app-level.
+
+         - Internal refactoring to make custom behavior easier to implement. Now
+           users can subclass or supply custom coderef for get_package,
+           get_meta, and get_code.
+
+
 0.42     2013-08-13 (SHARYANTO)
 
          - Bug fix for parse_url().
@@ -7,15 +21,23 @@ Revision history for Perinci-Access-InProcess
 
 0.41     2013-08-13 (SHARYANTO)
 
-         - Bug fix for parse_url().
+         [ENHANCEMENTS]
+
+         - Add parse_url() support.
 
 
 0.40     2013-08-13 (SHARYANTO)
 
-         - Remove dependency on Perinci::Util::get_package_meta_accessor
-           (removed in 0.35).
+         [REMOVED FEATURES]
 
-         - Add parse_url() support.
+         - Remove dependency on Perinci::Util::get_package_meta_accessor
+           (removed in 0.35). Thereby also removing the $PERINCI_META_ACCESSOR
+           feature (this variable in a package can point to another class which
+           tells people how to get the Rinci metadata for said package). This
+           feature is not that useful: we still need to load the module first.
+           There are cases where we might want to lookup metadata (or even map
+           Riap request uri -> Perl package) from the database without loading
+           .pm files. Thus we will rework this class to allow that.
 
 
 0.39     2012-11-02 (SHARYANTO)
@@ -30,12 +52,14 @@ Revision history for Perinci-Access-InProcess
 
          - Add option: use_wrapped_sub (to make it possible to use call original
            sub instead of wrapped version). Can also be set using
-           _perinci.access.inprocess.use_wrapped_sub in metadata.
+           _perinci.access.inprocess.use_wrapped_sub in metadata. Currently I
+           don't have a need for this yet.
 
 
 0.37     2012-10-31 (SHARYANTO)
 
          - Add option: cache_size (to make it possible to disable caching).
+           Currently used for testing/benchmarking overhead.
 
          - Update to Perinci::Sub::Wrapper 0.33.
 
@@ -65,31 +89,31 @@ Revision history for Perinci-Access-InProcess
 
 0.32     2012-08-28 (SHARYANTO)
 
-         Pass confirmation for actions 'undo' and 'redo' too (actually those are
-         the important ones).
+         - Pass confirmation for actions 'undo' and 'redo' too (actually those
+           are the important ones).
 
 
 0.31     2012-08-28 (SHARYANTO)
 
-         Implement confirmation (Rinci 1.1.27). Pass Riap request key 'confirm'
-         => 1 to pass '-confirm' to function (via TM).
+         - Implement confirmation (Rinci 1.1.27). Pass Riap request key
+           'confirm' => 1 to pass '-confirm' to function (via TM).
 
 
 0.30     2012-08-22 (SHARYANTO)
 
-         Adjust to Rinci 1.1.25. No longer check transaction support of
-         functions (we'll just let TM do that). No longer provide
-         -undo_trash_dir to function to simplify things.
+         - Adjust to Rinci 1.1.25. No longer check transaction support of
+           functions (we'll just let TM do that). No longer provide
+           -undo_trash_dir to function to simplify things.
 
 
 0.29     2012-08-16 (SHARYANTO)
 
-         Adjust to Rinci 1.1.23 and Perinci::Tx::Manager 0.22. No longer list
-         Perinci::Tx::Manager as dependency. Move transaction tests to
-         Perinci-Tx-Manager distribution.
+         - Adjust to Rinci 1.1.23 and Perinci::Tx::Manager 0.22. No longer list
+           Perinci::Tx::Manager as dependency. Move transaction tests to
+           Perinci-Tx-Manager distribution.
 
 
 0.28     2012-08-10 (SHARYANTO)
 
-         First release, split to make Perinci dist empty (that dist was a
-         growing mixed bag and caused headache in dependencies).
+         - First release, split to make Perinci dist empty (that dist was a
+           growing mixed bag and caused headache in dependencies).
