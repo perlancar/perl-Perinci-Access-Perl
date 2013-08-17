@@ -208,9 +208,8 @@ sub request {
     my $res = $self->check_request($req);
     return $res if $res;
 
-    my $meth = "action_$action";
-    return [502, "Action '$action' not implemented"] unless
-        $self->can($meth);
+    my $am = $self->{_actionmetas}{$action};
+    return [502, "Action '$action' not implemented"] unless $am;
 
     return [400, "Please specify URI"] unless $uri;
     $uri = URI->new($uri) unless blessed($uri);
@@ -225,36 +224,31 @@ sub request {
         return $res if $res;
     }
 
-    use Data::Dump; dd $req;
-
-    return [200, "OK"];
-
-        # find out type of leaf and other information
-
     my $type;
     my $entity_version;
-    #if ($leaf) {
-    #    if ($leaf =~ /^[%\@\$]/) {
-    #        # XXX check existence of variable
-    #        $type = 'variable';
-    #    } else {
-    #        return [404, "Can't find function $leaf in module $module"]
-    #            unless defined &{"$module\::$leaf"};
-    #        $type = 'function';
-    #    }
-    #} else {
-    #    $type = 'package';
-    #    $entity_version = ${$module . '::VERSION'};
-    #}
-    #$req->{-type} = $type;
-    #$req->{-entity_version} = $entity_version;
+    if (length($req->{-uri_leaf})) {
+        if ($req->{-uri_leaf} =~ /^[%\@\$]/) {
+            # XXX check existence of variable
+            $type = 'variable';
+        } else {
+            return [404, "Can't find function $req->{-uri_leaf} ".
+                        "in module $req->{-perl_package}"]
+                unless defined &{"$req->{-perl_package}\::$req->{-uri_leaf}"};
+            $type = 'function';
+        }
+    } else {
+        $type = 'package';
+        $entity_version = ${$req->{-perl_package} . '::VERSION'};
+    }
+    $req->{-type} = $type;
+    $req->{-entity_version} = $entity_version;
 
-    #$log->tracef("req=%s", $req);
+    return [502, "Action '$action' not implemented for ".
+                "'$req->{-type}' entity"]
+        unless $self->{_typeacts}{ $type }{ $action };
 
-    #return [502, "Action '$action' not implemented for ".
-    #            "'$req->{-type}' entity"]
-    #    unless $self->{_typeacts}{ $req->{-type} }{ $action };
-
+    $self->_get_meta()
+    my $meth = "action_$action";
     # check transaction
     $self->$meth($req);
 }
@@ -269,6 +263,8 @@ sub parse_url {
 sub actionmeta_info { +{
     applies_to => ['*'],
     summary    => "Get general information on code entity",
+    needs_meta => 0,
+    needs_code => 0,
 } }
 
 sub action_info {
@@ -286,6 +282,8 @@ sub action_info {
 sub actionmeta_actions { +{
     applies_to => ['*'],
     summary    => "List available actions for code entity",
+    needs_meta => 0,
+    needs_code => 0,
 } }
 
 sub action_actions {
@@ -899,6 +897,10 @@ C<after_load> setting is set, the hook will be called. If loading fails,
 processing will stop with an error response, unless for actions which does not
 require the Perl package (like C<action>) or when C<ignore_load_error> is set to
 true.
+
+The code entity type is then determined currently using a few simple heuristic
+rules: if C<-uri_leaf> is empty string, type is C<package>. If C<-uri_leaf>
+begins with C<[$%@]>, type is C<variable>. Otherwise, type is C<function>.
 
 TOWRITE: get_meta(), get_code() (wrapping, ...), actionmeta_* and action_*
 

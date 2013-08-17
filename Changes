@@ -10,7 +10,7 @@ Revision history for Perinci-Access-InProcess
            to do URL mangling at PSGI-app-level.
 
          - Internal refactoring to make custom behavior easier to implement. Now
-           users can subclass or supply custom coderef for get_package,
+           users can subclass or supply custom coderef for get_perl_package,
            get_meta, and get_code.
 
 
