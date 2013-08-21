@@ -62,6 +62,7 @@ sub _init {
     $self->{load}                  //= 1;
     $self->{extra_wrapper_args}    //= {};
     $self->{extra_wrapper_convert} //= {};
+    #$self->{use_wrapped_sub}
     #$self->{after_load}
     #$self->{prepend_namespace}
     #$self->{get_perl_package}
@@ -83,13 +84,13 @@ sub _get_code_and_meta {
 
     no strict 'refs';
     my ($self, $req) = @_;
-    my $name = $req->{-module} . "::" . $req->{-leaf};
+    my $name = $req->{-perl_package} . "::" . $req->{-uri_leaf};
     return [200, "OK (cached)", $self->{_cache}{$name}]
         if $self->{_cache}{$name};
 
     no strict 'refs';
-    my $metas = \%{"$req->{-module}::SPEC"};
-    my $meta = $metas->{ $req->{-leaf} || ":package" };
+    my $metas = \%{"$req->{-perl_package}::SPEC"};
+    my $meta = $metas->{ $req->{-uri_leaf} || ":package" };
 
     # supply a default, empty metadata for package, just so we can put $VERSION
     # into it
@@ -130,7 +131,7 @@ sub _get_code_and_meta {
             if $self->{cache_size};
     }
     unless (defined $meta->{entity_version}) {
-        my $ver = ${ $req->{-module} . "::VERSION" };
+        my $ver = ${ $req->{-perl_package} . "::VERSION" };
         if (defined $ver) {
             $meta->{entity_version} = $ver;
         }
@@ -199,6 +200,29 @@ sub _load_module {
     }
 }
 
+sub get_meta {
+    my $self = shift;
+    return $self->{get_meta}->(@_) if $self->{get_meta};
+
+    my ($req) = @_;
+    my $res = $self->_get_code_and_meta($req);
+    return $res unless $res->[0] == 200;
+    $req->{-meta} = $res->[2][1];
+    $req->{-orig_meta} = $res->[3]{orig_meta};
+    return;
+}
+
+sub get_code {
+    my $self = shift;
+    return $self->{get_code}->(@_) if $self->{get_code};
+
+    my ($req) = @_;
+    my $res = $self->_get_code_and_meta($req);
+    return $res unless $res->[0] == 200;
+    $req->{-code} = $res->[2][0];
+    return;
+}
+
 sub request {
     no strict 'refs';
 
@@ -247,7 +271,6 @@ sub request {
                 "'$req->{-type}' entity"]
         unless $self->{_typeacts}{ $type }{ $action };
 
-    $self->_get_meta()
     my $meth = "action_$action";
     # check transaction
     $self->$meth($req);
@@ -366,11 +389,10 @@ sub actionmeta_meta { +{
 
 sub action_meta {
     my ($self, $req) = @_;
-    return [404, "No metadata for /"] unless $req->{-module};
-    my $res = $self->_get_code_and_meta($req);
-    return $res unless $res->[0] == 200;
-    my (undef, $meta, $extra) = @{$res->[2]};
-    [200, "OK", $meta, {orig_meta=>$extra->{orig_meta}}];
+    return [404, "No metadata for /"] unless $req->{-perl_package};
+    my $res = $self->get_meta($req);
+    return $res if $res;
+    [200, "OK", $req->{-meta}, {orig_meta=>$req->{-orig_meta}}];
 }
 
 sub actionmeta_call { +{
@@ -418,7 +440,7 @@ sub action_call {
 
     if ($tm) {
         $res = $tm->action(
-            f => "$req->{-module}::$req->{-leaf}", args=>\%args,
+            f => "$req->{-perl_package}::$req->{-uri_leaf}", args=>\%args,
             confirm => $req->{confirm},
         );
         $tm->{_tx_id} = undef if $tm;
@@ -539,7 +561,7 @@ sub action_get {
     $req->{-leaf} =~ s/^([%\@\$])//
         or return [500, "BUG: Unknown variable prefix"];
     my $prefix = $1;
-    my $name = $req->{-module} . "::" . $req->{-leaf};
+    my $name = $req->{-perl_package} . "::" . $req->{-uri_leaf};
     my $res =
         $prefix eq '$' ? ${$name} :
             $prefix eq '@' ? \@{$name} :
@@ -902,7 +924,14 @@ The code entity type is then determined currently using a few simple heuristic
 rules: if C<-uri_leaf> is empty string, type is C<package>. If C<-uri_leaf>
 begins with C<[$%@]>, type is C<variable>. Otherwise, type is C<function>.
 
-TOWRITE: get_meta(), get_code() (wrapping, ...), actionmeta_* and action_*
+Then the appropriate C<action_ACTION()> method will be called. For example if
+action is C<meta> then C<action_meta()> method will be called, with C<$req> as
+the argument. This will in turn, depending on the action, either call
+C<get_meta()> (for example if action is C<meta>) or C<get_code()> (for example
+if action is C<call>), also with C<$req> as the argument. C<get_meta()> and
+C<get_code()> should return nothing on success, and set either C<< $req->{-meta}
+>> (a defhash containing Rinci metadata) or C<< $req->{-code} >> (a coderef)
+respectively. On error, they must return an enveloped response.
 
 
 =head1 METHODS
