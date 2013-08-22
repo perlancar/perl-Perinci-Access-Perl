@@ -1,17 +1,27 @@
 Revision history for Perinci-Access-InProcess
 
-0.43     2013-08-16 (SHARYANTO) (not yet released)
+0.43     2013-08-22 (SHARYANTO) (not yet released)
+
+         [INCOMPATIBLE CHANGES]
+
+         - Rename option 'use_wrapped_sub' to 'wrap'.
 
          [ENHANCEMENTS]
 
-         - Add option: prepend_namespace. This seems to be a common need (e.g.
-           in applications like App::cpanlists::Server, a couple of my projects)
-           so implementing it at the lower-level is convenient instead of having
-           to do URL mangling at PSGI-app-level.
+         - Internal refactoring to make custom behavior easier to implement
+           (unfinished).
 
-         - Internal refactoring to make custom behavior easier to implement. Now
-           users can subclass or supply custom coderef for get_perl_package,
-           get_meta, and get_code.
+         - Add options 'allow_paths' and 'deny_paths'.
+
+         [REMOVED FEATURES]
+
+         - Remove support for per-entity wrapping flag (via
+           _perinci.access.inprocess.use_wrapped_sub property) because it's
+           currently unused.
+
+         [ETC]
+
+         - Adjust to Perinci::Access::Base 0.29.
 
 
 0.42     2013-08-13 (SHARYANTO)

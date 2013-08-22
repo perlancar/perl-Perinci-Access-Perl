@@ -21,10 +21,11 @@ our $re_perl_package =
 # note: no method should die() because we are called by
 # Perinci::Access::HTTP::Server without extra eval().
 
-sub _init {
+sub new {
     require Class::Inspector;
 
-    my ($self) = @_;
+    my $class = shift;
+    my $self = $class->SUPER::new(@_);
 
     # build a list of supported actions for each type of entity
     my %typeacts = (
@@ -58,16 +59,24 @@ sub _init {
 
     $self->{cache_size}            //= 100;
     $self->{use_tx}                //= 0;
+    $self->{wrap}                  //= 1;
     $self->{custom_tx_manager}     //= undef;
     $self->{load}                  //= 1;
     $self->{extra_wrapper_args}    //= {};
     $self->{extra_wrapper_convert} //= {};
-    #$self->{use_wrapped_sub}
     #$self->{after_load}
-    #$self->{prepend_namespace}
-    #$self->{get_perl_package}
-    #$self->{get_meta}
-    #$self->{get_code}
+    #$self->{allow_paths}
+    #$self->{deny_paths}
+
+    # convert {allow,deny}_paths to array of regex to avoid reconstructing regex
+    # on each request
+    for my $pp ($self->{allow_paths}, $self->{deny_paths}) {
+        next unless defined $pp;
+        $pp = [$pp] unless ref($pp) eq 'ARRAY';
+        for (@$pp) {
+            $_ = qr#\A\Q$_\E(?:/|\z)# unless ref($_) eq 'Regexp';
+        }
+    }
 
     # to cache wrapped result
     if ($self->{cache_size}) {
@@ -77,75 +86,39 @@ sub _init {
     } else {
         $self->{_cache} = {};
     }
+
+    $self;
 }
 
-sub _get_code_and_meta {
-    require Perinci::Sub::Wrapper;
+# for older Perinci::Access::Base 0.28-, to remove later
+sub _init {}
 
-    no strict 'refs';
+sub __match_path {
+    my ($path, $paths) = @_;
+
+    for my $p (@$paths) {
+        return 1 if $path =~ $p;
+    }
+    0;
+}
+
+sub _parse_uri {
     my ($self, $req) = @_;
-    my $name = $req->{-perl_package} . "::" . $req->{-uri_leaf};
-    return [200, "OK (cached)", $self->{_cache}{$name}]
-        if $self->{_cache}{$name};
-
-    no strict 'refs';
-    my $metas = \%{"$req->{-perl_package}::SPEC"};
-    my $meta = $metas->{ $req->{-uri_leaf} || ":package" };
-
-    # supply a default, empty metadata for package, just so we can put $VERSION
-    # into it
-    if (!$meta && $req->{-type} eq 'package') {
-        $meta = {v=>1.1};
-    }
-    return [404, "No metadata for $name"] unless $meta;
-
-    my $code;
-    my $extra;
-    if ($req->{-type} eq 'function') {
-        $code = \&{$name};
-        my $wres = Perinci::Sub::Wrapper::wrap_sub(
-            sub=>$code, sub_name=>$name, meta=>$meta,
-            forbid_tags => ['die'],
-            %{$self->{extra_wrapper_args}},
-            convert=>{
-                args_as=>'hash', result_naked=>0,
-                %{$self->{extra_wrapper_convert}},
-            });
-        return [500, "Can't wrap function: $wres->[0] - $wres->[1]"]
-            unless $wres->[0] == 200;
-        if ($self->{use_wrapped_sub} //
-                $meta->{"_perinci.access.inprocess.use_wrapped_sub"} // 1) {
-            $code = $wres->[2]{sub};
-        }
-
-        $extra = {
-            # store some info about the old meta, no need to store all for
-            # efficiency
-            orig_meta=>{
-                result_naked=>$meta->{result_naked},
-                args_as=>$meta->{args_as},
-            },
-        };
-        $meta = $wres->[2]{meta};
-        $self->{_cache}{$name} = [$code, $meta, $extra]
-            if $self->{cache_size};
-    }
-    unless (defined $meta->{entity_version}) {
-        my $ver = ${ $req->{-perl_package} . "::VERSION" };
-        if (defined $ver) {
-            $meta->{entity_version} = $ver;
-        }
-    }
-    [200, "OK", [$code, $meta, $extra]];
-}
-
-sub get_perl_package {
-    my $self = shift;
-    return $self->{get_perl_package}->(@_) if $self->{get_perl_package};
-
-    my ($req) = @_;
 
     my $path = $req->{uri}->path || "/";
+
+    # TODO: do some normalization on paths, allow this to be optional if eats
+    # too much cycles
+
+    if (defined($self->{allow_paths}) &&
+            !__match_path($path, $self->{allow_paths})) {
+        return [403, "Forbidden uri path (does not match allow_paths)"];
+    }
+    if (defined($self->{deny_paths}) &&
+            __match_path($path, $self->{deny_paths})) {
+        return [403, "Forbidden uri path (matches deny_paths)"];
+    }
+
     my ($dir, $leaf, $perl_package);
     if ($path eq '/') {
         $dir  = '/';
@@ -162,24 +135,99 @@ sub get_perl_package {
             $_ = $dir;
             s!^/+!!g;
             s!/+!::!g;
-            $_ = "$self->{prepend_namespace}::$_" if $self->{prepend_namespace};
         }
     }
-
-    return [400, "Invalid uri (translates to invalid Perl package ".
-                '$perl_package']
+    return [400, "Invalid uri"]
         if $perl_package && $perl_package !~ $re_perl_package;
 
+    my $type;
+    if (length $leaf) {
+        if ($leaf =~ /^[%\@\$]/) {
+            $type = 'variable';
+        } else {
+            $type = 'function';
+        }
+    } else {
+        $type = 'package';
+    }
+
+    $req->{-uri_path}     = $path;
     $req->{-uri_dir}      = $dir;
     $req->{-uri_leaf}     = $leaf;
     $req->{-perl_package} = $perl_package;
+    $req->{-type}         = $type;
+
     return;
+}
+
+sub _get_code_and_meta {
+    require Perinci::Sub::Wrapper;
+
+    no strict 'refs';
+    my ($self, $req) = @_;
+    my $name = $req->{-perl_package} . "::" . $req->{-uri_leaf};
+    return [200, "OK (cached)", $self->{_cache}{$name}]
+        if $self->{_cache}{$name};
+
+    my $res = $self->_load_module($req);
+    return $res if $res;
+
+    no strict 'refs';
+    my $metas = \%{"$req->{-perl_package}::SPEC"};
+    my $meta = $metas->{ $req->{-uri_leaf} || ":package" };
+
+    # supply a default, empty metadata for package, just so we can put $VERSION
+    # into it
+    if (!$meta && $req->{-type} eq 'package') {
+        $meta = {v=>1.1};
+    }
+    return [404, "No metadata for $name"] unless $meta;
+
+    my $code;
+    my $extra = {};
+    if ($req->{-type} eq 'function') {
+        $code = \&{$name};
+        return [404, "Can't find function $req->{-uri_leaf} in ".
+                    "module $req->{-perl_package}"]
+            unless defined &{$name};
+        if ($self->{wrap}) {
+            my $wres = Perinci::Sub::Wrapper::wrap_sub(
+                sub=>$code, sub_name=>$name, meta=>$meta,
+                forbid_tags => ['die'],
+                %{$self->{extra_wrapper_args}},
+                convert=>{
+                    args_as=>'hash', result_naked=>0,
+                    %{$self->{extra_wrapper_convert}},
+                });
+            return [500, "Can't wrap function: $wres->[0] - $wres->[1]"]
+                unless $wres->[0] == 200;
+            $code = $wres->[2]{sub};
+            $extra->{orig_meta} = {
+                # store some info about the old meta, no need to store all for
+                # efficiency
+                result_naked=>$meta->{result_naked},
+                args_as=>$meta->{args_as},
+            };
+            $meta = $wres->[2]{meta};
+        }
+        $self->{_cache}{$name} = [$code, $meta, $extra]
+            if $self->{cache_size};
+    }
+    unless (defined $meta->{entity_version}) {
+        my $ver = ${ $req->{-perl_package} . "::VERSION" };
+        if (defined $ver) {
+            $meta->{entity_version} = $ver;
+        }
+    }
+    [200, "OK", [$code, $meta, $extra]];
 }
 
 sub _load_module {
     my ($self, $req) = @_;
 
     my $pkg = $req->{-perl_package};
+    return if !$pkg || !$self->{load} || package_exists($pkg);
+
     my $module_p = $pkg;
     $module_p =~ s!::!/!g;
     $module_p .= ".pm";
@@ -191,18 +239,17 @@ sub _load_module {
     my $module_load_err = $@;
     return [500, "Can't load module $pkg: $module_load_err"]
         if $module_load_err &&
-            !$self->{ignore_load_error} &&
             !$self->{_actionmetas}{$req->{action}}{module_missing_ok};
 
     if ($self->{after_load}) {
         eval { $self->{after_load}($self, module=>$pkg) };
         return [500, "after_load dies: $@"] if $@;
     }
+    return;
 }
 
 sub get_meta {
     my $self = shift;
-    return $self->{get_meta}->(@_) if $self->{get_meta};
 
     my ($req) = @_;
     my $res = $self->_get_code_and_meta($req);
@@ -214,7 +261,6 @@ sub get_meta {
 
 sub get_code {
     my $self = shift;
-    return $self->{get_code}->(@_) if $self->{get_code};
 
     my ($req) = @_;
     my $res = $self->_get_code_and_meta($req);
@@ -239,37 +285,12 @@ sub request {
     $uri = URI->new($uri) unless blessed($uri);
     $req->{uri} = $uri;
 
-    $res = $self->get_perl_package($req);
+    $res = $self->_parse_uri($req);
     return $res if $res;
-
-    if ($self->{load} && $req->{-perl_package} &&
-            !package_exists($req->{-perl_package})) {
-        $res = $self->_load_module($req);
-        return $res if $res;
-    }
-
-    my $type;
-    my $entity_version;
-    if (length($req->{-uri_leaf})) {
-        if ($req->{-uri_leaf} =~ /^[%\@\$]/) {
-            # XXX check existence of variable
-            $type = 'variable';
-        } else {
-            return [404, "Can't find function $req->{-uri_leaf} ".
-                        "in module $req->{-perl_package}"]
-                unless defined &{"$req->{-perl_package}\::$req->{-uri_leaf}"};
-            $type = 'function';
-        }
-    } else {
-        $type = 'package';
-        $entity_version = ${$req->{-perl_package} . '::VERSION'};
-    }
-    $req->{-type} = $type;
-    $req->{-entity_version} = $entity_version;
 
     return [502, "Action '$action' not implemented for ".
                 "'$req->{-type}' entity"]
-        unless $self->{_typeacts}{ $type }{ $action };
+        unless $self->{_typeacts}{ $req->{-type} }{ $action };
 
     my $meth = "action_$action";
     # check transaction
@@ -297,8 +318,12 @@ sub action_info {
         uri  => $req->{uri}->as_string,
         type => $req->{-type},
     };
-    $res->{entity_version} = $req->{-entity_version}
-        if defined $req->{-entity_version};
+    if ($req->{-type} eq 'package' && $req->{-perl_package}) {
+        my $res2 = $self->_load_module($req);
+        return $res2 if $res2;
+        no strict 'refs';
+        $res->{entity_version} //= ${ "$req->{-perl_package}\::VERSION" };
+    }
     [200, "OK", $res];
 }
 
@@ -338,6 +363,10 @@ sub action_list {
     my $detail = $req->{detail};
     my $f_type = $req->{type} || "";
 
+    # TMP
+    my $res = $self->_load_module($req);
+    return $res if $res;
+
     my @res;
 
     # XXX recursive?
@@ -345,9 +374,9 @@ sub action_list {
     # get submodules
     unless ($f_type && $f_type ne 'package') {
         my $lres = Module::List::list_modules(
-            $req->{-module} ? "$req->{-module}\::" : "",
+            $req->{-perl_package} ? "$req->{-perl_package}\::" : "",
             {list_modules=>1});
-        my $p0 = $req->{-path};
+        my $p0 = $req->{-uri_path};
         $p0 =~ s!/+$!!;
         for my $m (sort keys %$lres) {
             $m =~ s!.+::!!;
@@ -362,8 +391,8 @@ sub action_list {
 
     # get all entities from this module
     no strict 'refs';
-    my $spec = \%{"$req->{-module}\::SPEC"};
-    my $base = "pl:/$req->{-module}"; $base =~ s!::!/!g;
+    my $spec = \%{"$req->{-perl_package}\::SPEC"};
+    my $base = "pl:/$req->{-perl_package}"; $base =~ s!::!/!g;
     for (sort keys %$spec) {
         next if /^:/;
         my $uri = join("", $base, "/", $_);
@@ -389,9 +418,12 @@ sub actionmeta_meta { +{
 
 sub action_meta {
     my ($self, $req) = @_;
+
     return [404, "No metadata for /"] unless $req->{-perl_package};
+
     my $res = $self->get_meta($req);
     return $res if $res;
+
     [200, "OK", $req->{-meta}, {orig_meta=>$req->{-orig_meta}}];
 }
 
@@ -767,7 +799,7 @@ sub action_discard_all_txs {
 1;
 # ABSTRACT: Use Rinci access protocol (Riap) to access Perl code
 
-=for Pod::Coverage ^(actionmeta_.+|action_.+|get_(package|meta|code))$
+=for Pod::Coverage ^(actionmeta_.+|action_.+|get_(meta|code))$
 
 =head1 SYNOPSIS
 
@@ -819,10 +851,10 @@ sub action_discard_all_txs {
 
  # list all functions in package
  my $res = $pa->request(list => '/My/Module/', {type=>'function'});
- # -> [200, "OK", ['/My/Module/mult2', '/My/Module/multn']]
+ # -> [200, "OK", ['pl:/My/Module/mult2', 'pl:/My/Module/multn']]
 
  # call function
- my $res = $pa->request(call => '/My/Module/mult2', {args=>{a=>2, b=>3}});
+ my $res = $pa->request(call => 'pl:/My/Module/mult2', {args=>{a=>2, b=>3}});
  # -> [200, "OK", 6]
 
  # get function metadata
@@ -836,46 +868,44 @@ This class implements Rinci access protocol (L<Riap>) to access local Perl code.
 This might seem like a long-winded and slow way to access things that are
 already accessible from Perl like functions and metadata (in C<%SPEC>). Indeed,
 if you do not need Riap, you can access your module just like any normal Perl
-module. But this class is designed to be flexible and allows you to customize
-various aspects (most of the time, without subclassing).
+module.
 
-=over 4
+Supported features:
 
-=item * Custom mapping from uri to package
+=over
 
-By default, code entity's Riap URI maps directly to Perl packages, e.g.
-C</Foo/Bar/> maps to Perl package C<Foo::Bar> while C</Foo/Bar/baz> maps to a
-Perl function C<Foo::Bar::baz>.
+=item * Basic Riap actions
 
-You can override C<get_perl_package()> (either by subclassing or by supplying a
-coderef to C<get_perl_package> attribute).
+These include C<info>, C<actions>, C<meta>, C<list>, and C<call> actions.
 
-=item * Custom location of metadata
+=item * Transaction/undo
 
-By default, metadata are stored embedded in Perl code in C<%SPEC> package
-variables (with keys matching function names, or C<:package> for the package
-metadata itself).
-
-You can override C<get_meta()> (either by subclassing or by supplying a coderef
-to C<get_meta> attribute). For example, you can store metadata in separate file
-or database.
+According to L<Rinci::Transaction>.
 
 =item * Function wrapping
 
 Wrapping is used to convert argument passing style, produce result envelope, add
 argument validation, as well as numerous other functionalities. See
-L<Perinci::Sub::Wrapper> for more details on wrapping. The default C<get_code>
-behavior uses wrapping.
+L<Perinci::Sub::Wrapper> for more details on wrapping. The default behavior will
+call wrapped functions.
 
-=item * Transaction/undo
+=item * Custom location of metadata
 
-This class implements L<Riap::Transaction>.
+By default, metadata are assumed to be stored embedded in Perl source code in
+C<%SPEC> package variables (with keys matching function names, C<$variable>
+names, or C<:package> for the package metadata itself).
 
-=back
+You can override C<get_meta()> to provide custom behavior. For example, you can
+store metadata in separate file or database.
 
-Some other features that periai offers:
+=item * Custom code entity tree
 
-=over
+By default, tree are formed by traversing Perl packages and their contents, for
+example if a C<list> action is requested on uri C</Foo/Bar/> then the contents
+of package C<Foo::Bar> and its subpackages will be traversed for the entities.
+
+You can override C<action_list()> to provide custom behavior. For example, you
+can lookup from the database.
 
 =item * Progress indicator
 
@@ -895,43 +925,37 @@ object.
 
 =head2 How request is processed
 
-User calls C<< $pa->request($action => $uri, \%extras) >>. Internally, the class
-creates a hash C<$req> which contains Riap request keys as well as internal
-information about the Riap request (the latter will be prefixed with dash C<->).
-Initially it will contain C<action> and C<uri> (converted to L<URI> object) and
-the C<%extras> keys from the request() arguments sent by the user.
+User calls C<< $pa->request($action => $uri, \%extras) >>. Internally, the
+method creates a hash C<$req> which contains Riap request keys as well as
+internal information about the Riap request (the latter will be prefixed with
+dash C<->). Initially it will contain C<action> and C<uri> (converted to L<URI>
+object) and the C<%extras> keys from the request() arguments sent by the user.
 
-C<get_perl_package()> will be called, with C<$req> as argument. It is expected
-to set package name C<< $req->{-perl_package} >> containing Perl package name,
-C<< $res->{-uri_dir} >> containing the "dir" part of the uri and C<<
-$res->{-uri_leaf} >> containing the "basename" part of the uri. It should return
-false on success, or an envelope response on error (where processing will stop
-with this response).
-
-For example, if uri is C</Foo/Bar/> then C<-uri_dir> is C</Foo/Bar/> and
-C<-uri_leaf> is an empty string. If uri is C</Foo/Bar/baz> then C<-uri_dir> is
-C</Foo/Bar/> while C<-uri_leaf> is C<baz>. C<-uri_dir> will be used for the
-C<list> action.
-
-Depending on the C<load> setting, the Perl module at C<< $req->{-perl_package}
->> will be require'd if it has not been loaded. If loading is successful and the
-C<after_load> setting is set, the hook will be called. If loading fails,
-processing will stop with an error response, unless for actions which does not
-require the Perl package (like C<action>) or when C<ignore_load_error> is set to
-true.
+Internal C<_parse_uri()> method will be called to parse C<uri> into C<-uri_dir>
+(the "dir" part), C<-uri_leaf> (the "basename" part), and C<-perl_package>.
+Forbidden or invalid paths will cause this method to return an enveloped error
+response and the request to stop. For example, if C<uri> is C</Foo/Bar/> then
+C<-uri_dir> is C</Foo/Bar/> and C<-uri_leaf> is an empty string. If C<uri> is
+C</Foo/Bar/baz> then C<-uri_dir> is C</Foo/Bar/> while C<-uri_leaf> is C<baz>.
+C<-uri_dir> will be used for the C<list> action. In both cases, C<-perl_package>
+will be set to C<Foo::Bar>.
 
 The code entity type is then determined currently using a few simple heuristic
 rules: if C<-uri_leaf> is empty string, type is C<package>. If C<-uri_leaf>
 begins with C<[$%@]>, type is C<variable>. Otherwise, type is C<function>.
+C<-type> will be set.
 
-Then the appropriate C<action_ACTION()> method will be called. For example if
-action is C<meta> then C<action_meta()> method will be called, with C<$req> as
-the argument. This will in turn, depending on the action, either call
+After this, the appropriate C<action_ACTION()> method will be called. For
+example if action is C<meta> then C<action_meta()> method will be called, with
+C<$req> as the argument. This will in turn, depending on the action, either call
 C<get_meta()> (for example if action is C<meta>) or C<get_code()> (for example
 if action is C<call>), also with C<$req> as the argument. C<get_meta()> and
-C<get_code()> should return nothing on success, and set either C<< $req->{-meta}
->> (a defhash containing Rinci metadata) or C<< $req->{-code} >> (a coderef)
-respectively. On error, they must return an enveloped response.
+C<get_code()> should return nothing on success, and set either C<-meta> (a
+defhash containing Rinci metadata) or C<-code> (a coderef), respectively. On
+error, they must return an enveloped error response.
+
+C<get_meta()> or C<get_code()> might call C<_load_module()> to load Perl modules
+if the C<load> attribute is set to true.
 
 
 =head1 METHODS
@@ -942,53 +966,24 @@ Instantiate object. Known attributes:
 
 =over 4
 
-=item * prepend_namespace => STR
-
-If specified, will prepend this to Perl package names translated from uri Riap
-request key. For example, normally C</Foo/Bar/> maps to Perl package
-C<Foo::Bar>. But if C<prepend_namespace> is set to C<MyCompany::MyProduct>, then
-C</Foo/Bar/> will map to Perl package C<MyCompany::MyProduct::Foo::Bar>.
-
-This setting is only relevant if you use the default C<get_package>.
-
 =item * load => BOOL (default: 1)
 
-Whether to load Perl modules that are requested. For example, a request to
-C</Foo/Bar/> will, under the default C<get_package> behavior, map to Perl
-package C<Foo::Bar>. If this setting is on, the Perl module C<Foo::Bar> will be
-attempted to be loaded.
-
-=item * ignore_load_error => BOOL (default: 0)
-
-If set to true, failure loading Perl module will not abort the request.
+Whether to load Perl modules that are requested.
 
 =item * after_load => CODE
 
 If set, code will be executed the first time Perl module is successfully loaded.
 
-This is only relevant if you use the default C<get_package> behavior.
+=item * wrap => BOOL (default: 1)
 
-=item * use_wrapped_sub => BOOL (default: 1)
+If set to false, then wil use original subroutine and metadata instead of
+wrapped ones, for example if you are very concerned about performance (do not
+want to add another eval {} and subroutine call introduced by wrapping) or do
+not need the functionality provided by the wrapper (e.g. your function does not
+die and already validates its arguments, you do not want Sah schemas in the
+metadata to be normalized, etc).
 
-If set to false, then wil use original subroutine instead of wrapped one, for
-example if you are very concerned about performance (do not want to add another
-eval {} and subroutine call introduced by wrapping) or do not need the
-functionality provided by the wrapper (e.g. your function does not die and
-already validates its arguments, etc).
-
-Can also be set on a per-entity basis by setting the
-C<_perinci.access.inprocess.use_wrapped_sub> metadata property.
-
-This is only relevant if you use the default C<get_code> behavior.
-
-=item * cache_size => INT (default: 100)
-
-Specify cache size (in number of items). Cache saves the result of function
-wrapping so future requests to the same function need not involve wrapping
-again. Setting this to 0 disables caching.
-
-This is only relevant if you enable wrapping and only if you use the default
-C<get_code> behavior.
+Wrapping is implemented inside C<get_meta()> and C<get_code()>.
 
 =item * extra_wrapper_args => HASH
 
@@ -996,8 +991,7 @@ If set, will be passed to L<Perinci::Sub::Wrapper>'s wrap_sub() when wrapping
 subroutines. Some applications of this include: adding C<timeout> or
 C<result_postfilter> properties to functions.
 
-This is only relevant if you use the default C<get_meta> and C<get_code>
-behavior.
+This is only relevant if you enable C<wrap>.
 
 =item * extra_wrapper_convert => HASH
 
@@ -1005,10 +999,30 @@ If set, will be passed to L<Perinci::Sub::Wrapper> wrap_sub()'s C<convert>
 argument when wrapping subroutines. Some applications of this include: changing
 C<default_lang> of metadata.
 
-This is only relevant if you use the default C<get_meta> and C<get_code>
-behavior.
+This is only relevant if you enable C<wrap>.
 
-=item * use_tx => BOOL (default 0)
+=item * cache_size => INT (default: 100)
+
+Specify cache size (in number of items). Cache saves the result of function
+wrapping so future requests to the same function need not involve wrapping
+again. Setting this to 0 disables caching.
+
+Caching is implemented inside C<get_meta()> and C<get_code()> so you might want
+to implement your own caching if you override those.
+
+=item * allow_paths => REGEX|STR|ARRAY
+
+If defined, only requests with C<uri> matching specified path will be allowed.
+Can be a string (e.g. C</spanel/api/>) or regex (e.g. C<< qr{^/[^/]+/api/} >>)
+or an array of those.
+
+=item * deny_paths => REGEX|STR|ARRAY
+
+If defined, requests with C<uri> matching specified path will be denied. Like
+C<allow_paths>, value can be a string (e.g. C</spanel/api/>) or regex (e.g. C<<
+qr{^/[^/]+/api/} >>) or an array of those.
+
+=item * use_tx => BOOL (default: 0)
 
 Whether to allow transaction requests from client. Since this can cause the
 server to store transaction/undo data, this must be explicitly allowed.
@@ -1034,17 +1048,6 @@ basis.
 
 Process Riap request and return enveloped result. $server_url will be used as
 the Riap request key 'uri', as there is no server in this case.
-
-Some notes:
-
-=over 4
-
-=item * Metadata returned by the 'meta' action has normalized schemas in them
-
-Schemas in metadata (like in the C<args> and C<return> property) are normalized
-by L<Perinci::Sub::Wrapper>.
-
-=back
 
 =head2 $pa->parse_url($server_url) => HASH
 
