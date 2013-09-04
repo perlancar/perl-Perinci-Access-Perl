@@ -9,9 +9,9 @@ use parent qw(Perinci::Access::Base);
 
 use Perinci::Object;
 use Scalar::Util qw(blessed reftype);
+use SHARYANTO::ModuleOrPrefix::Path qw(module_or_prefix_path);
 use SHARYANTO::Package::Util qw(package_exists);
 use URI;
-use UUID::Random;
 
 # VERSION
 
@@ -160,6 +160,56 @@ sub _parse_uri {
     return;
 }
 
+# TODO: make it Tie::Cache with expiry
+my %negcache; # key = module_p, val = error resp
+
+sub _load_module {
+    my ($self, $req) = @_;
+
+    my $pkg = $req->{-perl_package};
+    # there is no module to load, or we are instructed not to load any modules.
+    return if !$pkg || !$self->{load};
+
+    # the problem is, if we load Foo::Bar, package Foo becomes exists even
+    # though we don't have module Foo.
+    #return if package_exists($pkg);
+
+    my $module_p = $pkg;
+    $module_p =~ s!::!/!g;
+    $module_p .= ".pm";
+
+    # module has been loaded before
+    return if exists($INC{$module_p});
+
+    # use (negative) cache result
+    return $negcache{$module_p} if exists $negcache{$module_p};
+
+    # load and cache negative result
+    my $res;
+    {
+        my $fullpath = module_or_prefix_path($module_p);
+        if (!$fullpath) {
+            $res = [404, "Can't find module or prefix path for package $pkg"];
+            last;
+        } elsif ($fullpath !~ /\.pm$/) {
+            $res = [405, "Can only find a prefix path for package $pkg"];
+            last;
+        }
+        eval { require $module_p };
+        if ($@) {
+            $res = [500, "Can't load module $pkg (probably compile error): $@"];
+            last;
+        }
+        # load is successful
+        if ($self->{after_load}) {
+            eval { $self->{after_load}($self, module=>$pkg) };
+            $log->error("after_load for package $pkg dies: $@") if $@;
+        }
+    }
+    $negcache{$module_p} = $res if $res;
+    return $res;
+}
+
 sub _get_code_and_meta {
     require Perinci::Sub::Wrapper;
 
@@ -222,38 +272,23 @@ sub _get_code_and_meta {
     [200, "OK", [$code, $meta, $extra]];
 }
 
-sub _load_module {
-    my ($self, $req) = @_;
-
-    my $pkg = $req->{-perl_package};
-    return if !$pkg || !$self->{load} || package_exists($pkg);
-
-    my $module_p = $pkg;
-    $module_p =~ s!::!/!g;
-    $module_p .= ".pm";
-
-    # WISHLIST: cache negative result if someday necessary
-    return if exists($INC{$module_p});
-
-    eval { require $module_p };
-    my $module_load_err = $@;
-    return [500, "Can't load module $pkg: $module_load_err"]
-        if $module_load_err &&
-            !$self->{_actionmetas}{$req->{action}}{module_missing_ok};
-
-    if ($self->{after_load}) {
-        eval { $self->{after_load}($self, module=>$pkg) };
-        return [500, "after_load dies: $@"] if $@;
-    }
-    return;
-}
-
 sub get_meta {
     my $self = shift;
 
     my ($req) = @_;
+
+    if (!$req->{-perl_package}) {
+        $req->{-meta} = {v=>1.1}; # empty metadata for /
+        return;
+    }
+
     my $res = $self->_get_code_and_meta($req);
-    return $res unless $res->[0] == 200;
+    if ($res->[0] == 405) {
+        $req->{-meta} = {v=>1.1}; # empty package metadata for dir
+        return;
+    } elsif ($res->[0] != 200) {
+        return $res;
+    }
     $req->{-meta} = $res->[2][1];
     $req->{-orig_meta} = $res->[3]{orig_meta};
     return;
@@ -351,9 +386,6 @@ sub action_actions {
 sub actionmeta_list { +{
     applies_to => ['package'],
     summary    => "List code entities inside this package code entity",
-
-    # this action does not require the associated perl module to exist
-    module_missing_ok => 1,
 } }
 
 sub action_list {
@@ -363,24 +395,39 @@ sub action_list {
     my $detail = $req->{detail};
     my $f_type = $req->{type} || "";
 
-    # TMP
-    my $res = $self->_load_module($req);
-    return $res if $res;
-
     my @res;
 
-    # XXX recursive?
+    my $filter_path = sub {
+        my $path = shift;
+        if (defined($self->{allow_paths}) &&
+                !__match_path($path, $self->{allow_paths})) {
+            return 0;
+        }
+        if (defined($self->{deny_paths}) &&
+                __match_path($path, $self->{deny_paths})) {
+            return 0;
+        }
+        1;
+    };
+
+    # TODO: if load=0, then instead of using list_modules(), use list_packages()
+    # instead and skip the filesystem.
 
     # get submodules
     unless ($f_type && $f_type ne 'package') {
         my $lres = Module::List::list_modules(
             $req->{-perl_package} ? "$req->{-perl_package}\::" : "",
-            {list_modules=>1});
+            {list_modules=>1, list_prefixes=>1});
         my $p0 = $req->{-uri_path};
         $p0 =~ s!/+$!!;
+        my %mem;
         for my $m (sort keys %$lres) {
+            $m =~ s!::$!!;
             $m =~ s!.+::!!;
-            my $uri = join("", "pl:", $p0, "/", $m, "/");
+            my $path = join("", $p0, "/", $m, "/");
+            next unless $filter_path->($path);
+            my $uri = "pl:$path";
+            next if $mem{$uri}++;
             if ($detail) {
                 push @res, {uri=>$uri, type=>"package"};
             } else {
@@ -389,13 +436,18 @@ sub action_list {
         }
     }
 
+    # ignore errors
+    $self->_load_module($req);
+
     # get all entities from this module
     no strict 'refs';
     my $spec = \%{"$req->{-perl_package}\::SPEC"};
-    my $base = "pl:/$req->{-perl_package}"; $base =~ s!::!/!g;
+    my $base = "/$req->{-perl_package}"; $base =~ s!::!/!g;
     for (sort keys %$spec) {
         next if /^:/;
-        my $uri = join("", $base, "/", $_);
+        my $path = join("", $base, "/", $_);
+        next unless $filter_path->($path);
+        my $uri = "pl:$path";
         my $t = $_ =~ /^[%\@\$]/ ? 'variable' : 'function';
         next if $f_type && $f_type ne $t;
         if ($detail) {
@@ -419,8 +471,6 @@ sub actionmeta_meta { +{
 sub action_meta {
     my ($self, $req) = @_;
 
-    return [404, "No metadata for /"] unless $req->{-perl_package};
-
     my $res = $self->get_meta($req);
     return $res if $res;
 
@@ -433,6 +483,8 @@ sub actionmeta_call { +{
 } }
 
 sub action_call {
+    require UUID::Random;
+
     my ($self, $req) = @_;
 
     my $res;
@@ -513,8 +565,8 @@ sub action_complete_arg_val {
         my $sch = $arg_p->{schema};
 
         my ($type, $cs) = @{$sch};
-        if ($cs->{'in'}) {
-            $words = $cs->{'in'};
+        if ($cs->{in}) {
+            $words = $cs->{in};
             return;
         }
 
@@ -587,10 +639,10 @@ sub action_get {
     no strict 'refs';
 
     my ($self, $req) = @_;
-    local $req->{-leaf} = $req->{-leaf};
+    local $req->{-uri_leaf} = $req->{-uri_leaf};
 
     # extract prefix
-    $req->{-leaf} =~ s/^([%\@\$])//
+    $req->{-uri_leaf} =~ s/^([%\@\$])//
         or return [500, "BUG: Unknown variable prefix"];
     my $prefix = $1;
     my $name = $req->{-perl_package} . "::" . $req->{-uri_leaf};

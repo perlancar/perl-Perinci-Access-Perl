@@ -1,5 +1,16 @@
 Revision history for Perinci-Access-InProcess
 
+0.44     2013-09-04 (SHARYANTO) (not yet released)
+
+         - meta on '/' now works.
+
+         - list now correctly lists prefixes, e.g. if there are only
+           foo::bar::baz and foo::bar::qux, list on '/foo/' correctly lists
+           '/foo/bar/' instead of returning empty.
+
+         - Observe {allow,deny}_paths in list.
+
+
 0.43     2013-08-22 (SHARYANTO)
 
          [INCOMPATIBLE CHANGES]

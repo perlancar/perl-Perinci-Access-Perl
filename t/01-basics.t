@@ -59,7 +59,7 @@ sub dry_run {
 $SPEC{tx} = {v=>1.1, features=>{tx=>{v=>2}, idempotent=>1}};
 sub tx {
     my %args = @_;
-    [200, "OK", $args{-tx_action} eq 'check_state' ? 1:2];
+    [200, "OK", ($args{-tx_action}//'') eq 'check_state' ? 1:2];
 }
 
 package Test::Perinci::Access::InProcess2;
@@ -88,7 +88,7 @@ package main;
 my $var = 12;
 test_request(
     name => 'opt: after_load called',
-    object_opts=>{after_load=>sub {$var++}},
+    object_opts=>{load=>1, after_load=>sub {$var++}},
     req => [call => '/Perinci/Examples/noop'],
     status => 200,
     posttest => sub {
@@ -97,7 +97,7 @@ test_request(
 );
 test_request(
     name => 'opt: after_load not called twice',
-    object_opts=>{after_load=>sub {$var++}},
+    object_opts=>{load=>1, after_load=>sub {$var++}},
     req => [call => '/Perinci/Examples/noop'],
     status => 200,
     posttest => sub {
@@ -128,9 +128,9 @@ test_request(
     result => { type => "package", uri => "pl:/", v => 1.1 },
 );
 test_request(
-    name => 'meta on / doesn\'t work yet',
+    name => 'meta on / works',
     req => [meta => "pl:/"],
-    status => 404,
+    status => 200,
 );
 test_request(
     name => 'meta on package',
@@ -205,7 +205,44 @@ test_request(
         is(ref($res->[2][0]), 'HASH', "record is hash");
     },
 );
-# XXX list: recursive
+test_request(
+    name => 'opt: allow_paths',
+    object_opts => {allow_paths=>qr!^/foo!},
+    req => [meta => "/Perinci/Examples/"],
+    status => 403,
+);
+test_request(
+    name => 'opt: allow_paths on list',
+    object_opts => {allow_paths=>qr!^/Perinci/Examples/([c]|$)!},
+    req => [list => "/Perinci/Examples/"],
+    status => 200,
+    posttest => sub {
+        my ($res) = @_;
+        ok(@{$res->[2]} <= 3, "number of results"); # call_gen_array, call_randlog
+    },
+);
+test_request(
+    name => 'opt: deny_paths 1',
+    object_opts => {deny_paths=>qr!^/foo!},
+    req => [meta => "/Perinci/Examples/"],
+    status => 200,
+);
+test_request(
+    name => 'opt: deny_paths 2',
+    object_opts => {deny_paths=>qr!^/P!},
+    req => [meta => "/Perinci/Examples/"],
+    status => 403,
+);
+test_request(
+    name => 'opt: deny_paths on list',
+    object_opts => {deny_paths=>qr!^/Perinci/Examples/[^c]!},
+    req => [list => "/Perinci/Examples/"],
+    status => 200,
+    posttest => sub {
+        my ($res) = @_;
+        ok(@{$res->[2]} <= 3, "number of results"); # call_gen_array, call_randlog
+    },
+);
 # XXX list: type
 
 test_request(
@@ -316,15 +353,7 @@ test_request(
 );
 
 test_request(
-    name => 'opt: load=0',
-    object_opts=>{load=>0},
-    req => [call => '/Test/Perinci/Access/InProcess/f1'],
-    status => 200,
-    result => 2,
-);
-test_request(
     name => 'schema in metadata is normalized',
-    object_opts=>{load=>0},
     req => [meta => '/Test/Perinci/Access/InProcess/f1'],
     status => 200,
     result => {
@@ -339,12 +368,12 @@ test_request(
         result_naked=>0,
         args_as=>'hash',
         entity_version=>1.2,
+        features=>{},
     },
 );
 
 test_request(
     name => 'child_metas action',
-    object_opts=>{load=>0},
     req => [child_metas => '/Test/Perinci/Access/InProcess/'],
     status => 200,
     result => {
@@ -366,6 +395,7 @@ test_request(
                 },
                 args_as => 'hash', result_naked => 0,
                 entity_version=>1.2,
+                features=>{},
             },
         'pl:/Test/Perinci/Access/InProcess/f2' =>
             {
@@ -378,6 +408,7 @@ test_request(
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,
                 entity_version=>1.2,
+                features=>{},
             },
         'pl:/Test/Perinci/Access/InProcess/dry_run' =>
             {
@@ -398,7 +429,7 @@ test_request(
 
 test_request(
     name => 'opt: extra_wrapper_args',
-    object_opts=>{extra_wrapper_args=>{remove_internal_properties=>0}},
+    object_opts=>{load=>0, extra_wrapper_args=>{remove_internal_properties=>0}},
     req => [meta => '/Test/Perinci/Access/InProcess/f1'],
     status => 200,
     posttest => sub {
@@ -410,7 +441,7 @@ test_request(
 );
 test_request(
     name => 'opt: extra_wrapper_convert',
-    object_opts=>{extra_wrapper_convert=>{default_lang=>"id_ID"}},
+    object_opts=>{load=>0, extra_wrapper_convert=>{default_lang=>"id_ID"}},
     req => [meta => '/Test/Perinci/Access/InProcess/f1'],
     status => 200,
     posttest => sub {
@@ -438,13 +469,13 @@ test_request(
 
 test_request(
     name => 'opt: wrap=0',
-    object_opts=>{wrap=>0},
+    object_opts=>{load=>0, wrap=>0},
     req => [call => '/Test/Perinci/Access/InProcess2/test_uws', {args=>{x=>1}}],
     status => 200,
 );
 test_request(
     name => 'opt: wrap=1 (the default)',
-    object_opts=>{},
+    object_opts=>{load=>0},
     req => [call => '/Test/Perinci/Access/InProcess2/test_uws', {args=>{x=>1}}],
     status => 400,
 );
@@ -474,7 +505,7 @@ sub test_request {
             $pa = Perinci::Access::InProcess->new(%{$args{object_opts}});
         } else {
             unless ($pa_cached) {
-                $pa_cached = Perinci::Access::InProcess->new;
+                $pa_cached = Perinci::Access::InProcess->new(load=>0);
             }
             $pa = $pa_cached;
         }
