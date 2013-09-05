@@ -1,5 +1,13 @@
 Revision history for Perinci-Access-InProcess
 
+0.45     2013-09-05 (SHARYANTO)
+
+         [BUG FIXES]
+
+         - Fix regression: if package already exists (like 'main'), don't fail
+           the module loading. This broke a lot of scripts yesterday.
+
+
 0.44     2013-09-04 (SHARYANTO)
 
          - meta on '/' now works.

@@ -168,11 +168,7 @@ sub _load_module {
 
     my $pkg = $req->{-perl_package};
     # there is no module to load, or we are instructed not to load any modules.
-    return if !$pkg || !$self->{load};
-
-    # the problem is, if we load Foo::Bar, package Foo becomes exists even
-    # though we don't have module Foo.
-    #return if package_exists($pkg);
+    return if !$pkg || !$self->{load} || package_exists($pkg);
 
     my $module_p = $pkg;
     $module_p =~ s!::!/!g;
