@@ -436,10 +436,10 @@ sub action_list {
     # get all entities from this module
     no strict 'refs';
     my $spec = \%{"$req->{-perl_package}\::SPEC"};
-    my $base = "/$req->{-perl_package}"; $base =~ s!::!/!g;
+    my $base = $req->{-uri_path};
     for (sort keys %$spec) {
         next if /^:/;
-        my $path = join("", $base, "/", $_);
+        my $path = join("", $base, $_);
         next unless $filter_path->($path);
         my $uri = "pl:$path";
         my $t = $_ =~ /^[%\@\$]/ ? 'variable' : 'function';

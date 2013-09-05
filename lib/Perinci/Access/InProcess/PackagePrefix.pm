@@ -24,7 +24,6 @@ sub _parse_uri {
     $req->{-perl_package} = $self->{package_prefix} .
         ($req->{-perl_package} ? "::$req->{-perl_package}" : "")
             if $self->{package_prefix};
-    use Data::Dump; dd $req;
     return;
 }
 
