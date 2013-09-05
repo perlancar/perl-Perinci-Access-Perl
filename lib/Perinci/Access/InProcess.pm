@@ -120,22 +120,20 @@ sub _parse_uri {
     }
 
     my ($dir, $leaf, $perl_package);
-    if ($path eq '/') {
+    if ($path =~ m!\A/(.+)/+(.*)\z!) {
+        $dir  = $1;
+        $leaf = $2;
+    } elsif ($path =~ m!\A/+(.+)\z!) {
         $dir  = '/';
-        $leaf = '';
+        $leaf = $1;
     } else {
-        if ($path =~ m!(.+)/+(.*)!) {
-            $dir  = $1;
-            $leaf = $2;
-        } else {
-            $dir  = $path;
-            $leaf = '';
-        }
-        for ($perl_package) {
-            $_ = $dir;
-            s!^/+!!g;
-            s!/+!::!g;
-        }
+        $dir = '/';
+        $leaf = '';
+    }
+    for ($perl_package) {
+        $_ = $dir;
+        s!\A/+!!;
+        s!/+!::!g;
     }
     return [400, "Invalid uri"]
         if $perl_package && $perl_package !~ $re_perl_package;

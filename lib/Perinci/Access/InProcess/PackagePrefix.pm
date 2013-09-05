@@ -21,8 +21,9 @@ sub _parse_uri {
     my $res = $self->SUPER::_parse_uri($req);
     return $res if $res;
 
-    $req->{-perl_package} = "$self->{package_prefix}\::$req->{-perl_package}"
-        if $self->{package_prefix};
+    $req->{-perl_package} = $self->{package_prefix} .
+        ($req->{-perl_package} ? "::$req->{-perl_package}" : "")
+            if $self->{package_prefix};
     use Data::Dump; dd $req;
     return;
 }
