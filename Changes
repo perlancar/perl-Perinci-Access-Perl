@@ -1,5 +1,18 @@
 Revision history for Perinci-Access-InProcess
 
+0.46     2013-09-07 (SHARYANTO)
+
+         [BUG FIXES]
+
+         - Bugfix: list should only ignore missing modules, not compile errors.
+
+         - Fix uri parsing: /foo should mean function 'foo', not package 'foo'.
+
+         [ENHANCEMENTS]
+
+         - Add PackagePrefix subclass (proof of concept).
+
+
 0.45     2013-09-05 (SHARYANTO)
 
          [BUG FIXES]
