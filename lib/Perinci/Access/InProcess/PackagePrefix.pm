@@ -6,6 +6,8 @@ use warnings;
 
 use parent qw(Perinci::Access::InProcess);
 
+# VERSION
+
 sub new {
     my $class = shift;
 
