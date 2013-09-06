@@ -430,8 +430,11 @@ sub action_list {
         }
     }
 
-    # ignore errors
-    $self->_load_module($req);
+    my $res = $self->_load_module($req);
+    # ignore missing modules
+    if ($res && $res->[0] != 404 && $res->[0] != 405) {
+        return $res;
+    }
 
     # get all entities from this module
     no strict 'refs';
