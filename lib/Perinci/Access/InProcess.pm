@@ -158,8 +158,8 @@ sub _parse_uri {
     return;
 }
 
-# TODO: make it Tie::Cache with expiry
-my %negcache; # key = module_p, val = error resp
+# TODO: make it Tie::Cache with expiry?
+my %loadcache; # key = module_p, val = error resp or undef if successful
 
 sub _load_module {
     my ($self, $req) = @_;
@@ -176,8 +176,9 @@ sub _load_module {
     # module has been loaded before
     return if exists($INC{$module_p});
 
-    # use (negative) cache result
-    return $negcache{$module_p} if exists $negcache{$module_p};
+    # use cache result (for caching errors, or packages like 'main' and 'CORE'
+    # where no modules for such packages exist)
+    return $loadcache{$module_p} if exists $loadcache{$module_p};
 
     # load and cache negative result
     my $res;
@@ -208,7 +209,7 @@ sub _load_module {
             $log->error("after_load for package $pkg dies: $@") if $@;
         }
     }
-    $negcache{$module_p} = $res if $res;
+    $loadcache{$module_p} = $res;
     return $res;
 }
 
