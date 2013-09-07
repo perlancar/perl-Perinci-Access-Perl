@@ -20,7 +20,15 @@ our $VERSION = 0.123;
 
 our %SPEC;
 $SPEC{f1} = {v=>1.1, args=>{}};
-sub f1 {}
+sub f1 { [200] }
+
+package Baz;
+our $VERSION = 0.124;
+
+our %SPEC;
+$SPEC{':package'} = {v=>1.1, entity_v=>9};
+$SPEC{f1} = {v=>1.1, entity_v=>10};
+sub f1 { [200] }
 
 package Test::Perinci::Access::InProcess;
 our %SPEC;
@@ -120,17 +128,34 @@ test_request(
     req => [call => "/"],
     status => 502,
 );
-test_request(
-    req => [info => "/"],
-    status => 200,
-    result => { type => "package", uri => "/", v => 1.1 },
-);
-test_request(
-    name => 'pl: uri scheme',
-    req => [info => "pl:/"],
-    status => 200,
-    result => { type => "package", uri => "pl:/", v => 1.1 },
-);
+
+subtest "action info" => sub {
+    test_request(
+        name => "info on / works",
+        req => [info => "/"],
+        status => 200,
+        result => {v=>1.1, uri=>"/", type=>"package"}, # not becomes pl:/ ?
+    );
+    test_request(
+        name => 'pl: uri scheme',
+        req => [info => "pl:/"],
+        status => 200,
+        result => {v=>1.1, type=>"package", uri=>"pl:/"},
+    );
+    test_request(
+        name => 'info on package',
+        req => [info => "/Foo/"],
+        status => 200,
+        result => {v=>1.1, uri=>'/Foo/', type=>'package'},
+    );
+    test_request(
+        name => 'info on function',
+        req => [info => "/Baz/f1"],
+        status => 200,
+        result => {v=>1.1, uri=>'/Baz/f1', type=>'function'},
+    );
+};
+
 test_request(
     name => 'meta on / works',
     req => [meta => "pl:/"],
@@ -145,7 +170,7 @@ test_request(
                 entity_v => $Test::Perinci::Access::InProcess::VERSION },
 );
 test_request(
-    name => 'meta on package (default meta)',
+    name => 'meta on package (default meta, no VERSION)',
     req => [meta => "/Foo/"],
     status => 200,
     result => { v => 1.1 },
@@ -161,10 +186,21 @@ test_request(
     object_opts=>{wrap=>0},
     req => [meta => "/Bar/f1"],
     status => 200,
-    result => {
-        v=>1.1, args=>{},
-        entity_v => 0.123,
-    },
+    result => {v=>1.1, args=>{}, entity_v => 0.123},
+);
+test_request(
+    name => 'meta on package (entity_v not overriden)',
+    object_opts=>{wrap=>0},
+    req => [meta => "/Baz/"],
+    status => 200,
+    result => {v=>1.1, entity_v=>9},
+);
+test_request(
+    name => 'meta on function (entity_v not overriden)',
+    object_opts=>{wrap=>0},
+    req => [meta => "/Baz/f1"],
+    status => 200,
+    result => {v=>1.1, entity_v=>10},
 );
 test_request(
     name => 'ending slash matters',

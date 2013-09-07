@@ -363,12 +363,6 @@ sub action_info {
         uri  => $req->{uri}->as_string,
         type => $req->{-type},
     };
-    if ($req->{-perl_package}) {
-        my $res2 = $self->_load_module_ignore_missing($req);
-        return $res2 if $res2;
-        no strict 'refs';
-        $res->{entity_v} //= ${ "$req->{-perl_package}\::VERSION" };
-    }
     [200, "OK", $res];
 }
 
