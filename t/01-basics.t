@@ -138,7 +138,7 @@ test_request(
     status => 200,
     result => { summary => "A package",
                 v => 1.1,
-                entity_version => $Test::Perinci::Access::InProcess::VERSION },
+                entity_v => $Test::Perinci::Access::InProcess::VERSION },
 );
 test_request(
     name => 'meta on package (default meta)',
@@ -150,7 +150,7 @@ test_request(
     name => 'meta on package (default meta + version)',
     req => [meta => "/Bar/"],
     status => 200,
-    result => { v => 1.1, entity_version => 0.123 },
+    result => { v => 1.1, entity_v => 0.123 },
 );
 test_request(
     name => 'ending slash matters',
@@ -367,7 +367,7 @@ test_request(
         },
         result_naked=>0,
         args_as=>'hash',
-        entity_version=>1.2,
+        entity_v=>1.2,
         features=>{},
     },
 );
@@ -381,7 +381,7 @@ test_request(
             {
                 v=>1.1,
                 summary=>"A variable",
-                entity_version=>1.2,
+                entity_v=>1.2,
             },
         'pl:/Test/Perinci/Access/InProcess/f1' =>
             {
@@ -394,34 +394,34 @@ test_request(
                     schema => ['int'=>{req=>1}, {}],
                 },
                 args_as => 'hash', result_naked => 0,
-                entity_version=>1.2,
+                entity_v=>1.2,
                 features=>{},
             },
         'pl:/Test/Perinci/Access/InProcess/f2' =>
             {
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,
-                entity_version=>1.2,
+                entity_v=>1.2,
             },
         'pl:/Test/Perinci/Access/InProcess/req_confirm' =>
             {
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,
-                entity_version=>1.2,
+                entity_v=>1.2,
                 features=>{},
             },
         'pl:/Test/Perinci/Access/InProcess/dry_run' =>
             {
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,
-                entity_version=>1.2,
+                entity_v=>1.2,
                 features => {dry_run=>1},
             },
         'pl:/Test/Perinci/Access/InProcess/tx' =>
             {
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,
-                entity_version=>1.2,
+                entity_v=>1.2,
                 features => {tx=>{v=>2}, idempotent=>1},
             },
     },

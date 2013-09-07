@@ -257,10 +257,10 @@ sub _get_code_and_meta {
         $self->{_cache}{$name} = [$code, $meta, $extra]
             if $self->{cache_size};
     }
-    unless (defined $meta->{entity_version}) {
+    unless (defined $meta->{entity_v}) {
         my $ver = ${ $req->{-perl_package} . "::VERSION" };
         if (defined $ver) {
-            $meta->{entity_version} = $ver;
+            $meta->{entity_v} = $ver;
         }
     }
     [200, "OK", [$code, $meta, $extra]];
@@ -351,7 +351,7 @@ sub action_info {
         my $res2 = $self->_load_module($req);
         return $res2 if $res2;
         no strict 'refs';
-        $res->{entity_version} //= ${ "$req->{-perl_package}\::VERSION" };
+        $res->{entity_v} //= ${ "$req->{-perl_package}\::VERSION" };
     }
     [200, "OK", $res];
 }
