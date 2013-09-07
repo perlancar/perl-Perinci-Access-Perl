@@ -340,14 +340,14 @@ subtest "action: meta" => sub {
         result => {v=>1.1, args=>{}, entity_v => 0.123},
     );
     test_request(
-        name => 'meta on package (entity_v not overriden)',
+        name => 'meta on package (entity_v not overridden)',
         object_opts=>{wrap=>0},
         req => [meta => "/Baz/"],
         status => 200,
         result => {v=>1.1, entity_v=>9},
     );
     test_request(
-        name => 'meta on function (entity_v not overriden)',
+        name => 'meta on function (entity_v not overridden)',
         object_opts=>{wrap=>0},
         req => [meta => "/Baz/f1"],
         status => 200,
