@@ -11,6 +11,7 @@ use Perinci::Object;
 use Scalar::Util qw(blessed reftype);
 use SHARYANTO::ModuleOrPrefix::Path qw(module_or_prefix_path);
 use SHARYANTO::Package::Util qw(package_exists);
+use Tie::Cache;
 use URI;
 
 # VERSION
@@ -80,7 +81,6 @@ sub new {
 
     # to cache wrapped result
     if ($self->{cache_size}) {
-        require Tie::Cache;
         tie my(%cache), 'Tie::Cache', $self->{cache_size};
         $self->{_cache} = \%cache;
     } else {
@@ -158,8 +158,9 @@ sub _parse_uri {
     return;
 }
 
-# TODO: make it Tie::Cache with expiry?
-my %loadcache; # key = module_p, val = error resp or undef if successful
+# key = module_p, val = error resp or undef if successful
+my %loadcache;
+tie %loadcache, 'Tie::Cache', 200;
 
 sub _load_module {
     my ($self, $req) = @_;
@@ -173,8 +174,12 @@ sub _load_module {
     $module_p =~ s!::!/!g;
     $module_p .= ".pm";
 
-    # module has been loaded before
-    return if exists($INC{$module_p});
+    # module has been required before and successfully loaded
+    return if $INC{$module_p};
+
+    # module has been required before and failed
+    return [500, "Module $pkg has failed to load previously"]
+        if exists($INC{$module_p});
 
     # use cache result (for caching errors, or packages like 'main' and 'CORE'
     # where no modules for such packages exist)
@@ -213,34 +218,29 @@ sub _load_module {
     return $res;
 }
 
-sub _load_module_ignore_missing {
-    my ($self, $req) = @_;
-    my $res = $self->_load_module($req);
-    return $res if $res && $res->[0] != 404 && $res->[0] != 405;
-    return;
-}
-
 sub _get_code_and_meta {
     require Perinci::Sub::Wrapper;
 
     no strict 'refs';
     my ($self, $req) = @_;
     my $name = $req->{-perl_package} . "::" . $req->{-uri_leaf};
+    my $type = $req->{-type};
     return [200, "OK (cached)", $self->{_cache}{$name}]
         if $self->{_cache}{$name};
 
     my $res = $self->_load_module($req);
-    return $res if $res;
+    # missing module (but existing prefix) is okay for package, we construct an
+    # empty package metadata for it
+    return $res if $res && !($type eq 'package' && $res->[0] == 405);
 
     no strict 'refs';
     my $metas = \%{"$req->{-perl_package}::SPEC"};
     my $meta = $metas->{ $req->{-uri_leaf} || ":package" };
 
-    # supply a default, empty metadata for package, just so we can put $VERSION
-    # into it
-    if (!$meta && $req->{-type} eq 'package') {
+    if (!$meta && $type eq 'package') {
         $meta = {v=>1.1};
     }
+
     return [404, "No metadata for $name"] unless $meta;
 
     my $code;
@@ -358,11 +358,16 @@ sub actionmeta_info { +{
 
 sub action_info {
     my ($self, $req) = @_;
+
+    my $mres = $self->get_meta($req);
+    return $mres if $mres;
+
     my $res = {
         v    => 1.1,
         uri  => $req->{uri}->as_string,
         type => $req->{-type},
     };
+
     [200, "OK", $res];
 }
 
@@ -375,6 +380,10 @@ sub actionmeta_actions { +{
 
 sub action_actions {
     my ($self, $req) = @_;
+
+    my $mres = $self->get_meta($req);
+    return $mres if $mres;
+
     my @res;
     for my $k (sort keys %{ $self->{_typeacts}{$req->{-type}} }) {
         my $v = $self->{_typeacts}{$req->{-type}}{$k};
@@ -440,8 +449,8 @@ sub action_list {
         }
     }
 
-    my $res = $self->_load_module_ignore_missing($req);
-    return $res if $res;
+    my $res = $self->_load_module($req);
+    return $res if $res && $res->[0] != 405;
 
     # get all entities from this module
     no strict 'refs';

@@ -6,6 +6,8 @@ use warnings;
 use FindBin '$Bin';
 use lib "$Bin/lib";
 
+use File::Slurp;
+use File::Temp qw(tempdir);
 use Test::More 0.96;
 
 use Perinci::Access::InProcess;
@@ -117,6 +119,108 @@ test_request(
     },
 );
 # XXX test trapping of die in after_load
+
+subtest "failure in loading module" => sub {
+    local @INC = @INC;
+    my $tmpdir = tempdir(CLEANUP=>1);
+    unshift @INC, $tmpdir;
+    my $prefix = "M" . int(rand()*900_000_000+100_000_000);
+    my $prefix2;
+    while (1) {
+        $prefix2 = "M" . int(rand()*900_000_000+100_000_000);
+        last unless $prefix eq $prefix2;
+    }
+    mkdir "$tmpdir/$prefix";
+    write_file "$tmpdir/$prefix/OK.pm", "package $prefix\::OK; 1;";
+    write_file "$tmpdir/$prefix/Err.pm", "package $prefix\::Err; 1=;";
+    test_request(
+        name => "ok",
+        object_opts=>{}, # so it creates a new riap client and defeat cache
+        req => [meta => "/$prefix/OK/"],
+        status => 200,
+    );
+
+    test_request(
+        name => "missing module/prefix on actions",
+        object_opts=>{}, # so it creates a new riap client and defeat cache
+        req => [actions => "/$prefix2/"],
+        status => 404,
+    );
+    test_request(
+        name => "missing module/prefix is cached",
+        req => [actions => "/$prefix2/"],
+        status => 404,
+    );
+    test_request(
+        name => "missing module/prefix on list",
+        object_opts=>{}, # so it creates a new riap client and defeat cache
+        req => [list => "/$prefix2/"],
+        status => 404,
+    );
+    test_request(
+        name => "missing module/prefix on info",
+        object_opts=>{}, # so it creates a new riap client and defeat cache
+        req => [info => "/$prefix2/"],
+        status => 404,
+    );
+    test_request(
+        name => "missing module/prefix on meta",
+        object_opts=>{}, # so it creates a new riap client and defeat cache
+        req => [meta => "/$prefix2/"],
+        status => 404,
+    );
+
+    test_request(
+        name => "missing module but existing prefix is okay on actions",
+        object_opts=>{}, # so it creates a new riap client and defeat cache
+        req => [actions => "/$prefix/"],
+        status => 200,
+    );
+    test_request(
+        name => "missing module but existing prefix is okay on list",
+        object_opts=>{}, # so it creates a new riap client and defeat cache
+        req => [list => "/$prefix/"],
+        status => 200,
+        result => ["pl:/$prefix/Err/", "pl:/$prefix/OK/"],
+    );
+    test_request(
+        name => "missing module but existing prefix is okay on info",
+        object_opts=>{}, # so it creates a new riap client and defeat cache
+        req => [info => "/$prefix/"],
+        status => 200,
+    );
+    test_request(
+        name => "missing module but existing prefix is okay on meta",
+        object_opts=>{}, # so it creates a new riap client and defeat cache
+        req => [meta => "/$prefix/"],
+        status => 200,
+    );
+
+    test_request(
+        name => "missing function on meta (1)",
+        object_opts=>{}, # so it creates a new riap client and defeat cache
+        req => [meta => "/$prefix/foo"],
+        status => 404,
+    );
+    test_request(
+        name => "missing function on meta (2)",
+        object_opts=>{}, # so it creates a new riap client and defeat cache
+        req => [meta => "/$prefix/OK/foo"],
+        status => 404,
+    );
+
+    test_request(
+        name => "compile error in module on actions",
+        object_opts=>{}, # so it creates a new riap client and defeat cache
+        req => [actions => "/$prefix/Err/"],
+        status => 500,
+    );
+    test_request(
+        name => "compile error in module is cached",
+        req => [actions => "/$prefix/Err/"],
+        status => 500,
+    );
+};
 
 test_request(
     name => 'unknown action',
@@ -369,7 +473,7 @@ subtest "action: call" => sub {
     );
 };
 
-subtest "complete_arg_val" => sub {
+subtest "action: complete_arg_val" => sub {
     test_request(
         name => 'complete_arg_val: missing arg',
         req => [complete_arg_val => "/Perinci/Examples/test_completion", {}],
@@ -560,6 +664,8 @@ subtest "parse_url" => sub {
 DONE_TESTING:
 done_testing();
 
+# riap client uses one from last test, unless object_opts is specified where it
+# will create a new object.
 sub test_request {
     my %args = @_;
     my $req = $args{req};
