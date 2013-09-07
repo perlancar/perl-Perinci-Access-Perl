@@ -18,6 +18,10 @@ package Foo;
 package Bar;
 our $VERSION = 0.123;
 
+our %SPEC;
+$SPEC{f1} = {v=>1.1, args=>{}};
+sub f1 {}
+
 package Test::Perinci::Access::InProcess;
 our %SPEC;
 
@@ -88,7 +92,7 @@ package main;
 my $var = 12;
 test_request(
     name => 'opt: after_load called',
-    object_opts=>{load=>1, after_load=>sub {$var++}},
+    object_opts=>{after_load=>sub {$var++}},
     req => [call => '/Perinci/Examples/noop'],
     status => 200,
     posttest => sub {
@@ -97,7 +101,7 @@ test_request(
 );
 test_request(
     name => 'opt: after_load not called twice',
-    object_opts=>{load=>1, after_load=>sub {$var++}},
+    object_opts=>{after_load=>sub {$var++}},
     req => [call => '/Perinci/Examples/noop'],
     status => 200,
     posttest => sub {
@@ -147,22 +151,25 @@ test_request(
     result => { v => 1.1 },
 );
 test_request(
-    name => 'meta on package (default meta + version)',
+    name => 'meta on package (default meta, entity_v from VERSION)',
     req => [meta => "/Bar/"],
     status => 200,
     result => { v => 1.1, entity_v => 0.123 },
 );
 test_request(
+    name => 'meta on function (entity_v from VERSION)',
+    object_opts=>{wrap=>0},
+    req => [meta => "/Bar/f1"],
+    status => 200,
+    result => {
+        v=>1.1, args=>{},
+        entity_v => 0.123,
+    },
+);
+test_request(
     name => 'ending slash matters',
     req => [meta => "/Perinci/Examples"],
     status => 404,
-);
-
-test_request(
-    name => 'meta on function',
-    req => [meta => "/Perinci/Examples/test_completion"],
-    status => 200,
-    posttest => sub {},
 );
 
 test_request(
@@ -429,7 +436,7 @@ test_request(
 
 test_request(
     name => 'opt: extra_wrapper_args',
-    object_opts=>{load=>0, extra_wrapper_args=>{remove_internal_properties=>0}},
+    object_opts=>{extra_wrapper_args=>{remove_internal_properties=>0}},
     req => [meta => '/Test/Perinci/Access/InProcess/f1'],
     status => 200,
     posttest => sub {
@@ -441,7 +448,7 @@ test_request(
 );
 test_request(
     name => 'opt: extra_wrapper_convert',
-    object_opts=>{load=>0, extra_wrapper_convert=>{default_lang=>"id_ID"}},
+    object_opts=>{extra_wrapper_convert=>{default_lang=>"id_ID"}},
     req => [meta => '/Test/Perinci/Access/InProcess/f1'],
     status => 200,
     posttest => sub {
@@ -469,13 +476,13 @@ test_request(
 
 test_request(
     name => 'opt: wrap=0',
-    object_opts=>{load=>0, wrap=>0},
+    object_opts=>{wrap=>0},
     req => [call => '/Test/Perinci/Access/InProcess2/test_uws', {args=>{x=>1}}],
     status => 200,
 );
 test_request(
     name => 'opt: wrap=1 (the default)',
-    object_opts=>{load=>0},
+    object_opts=>{},
     req => [call => '/Test/Perinci/Access/InProcess2/test_uws', {args=>{x=>1}}],
     status => 400,
 );
@@ -505,7 +512,7 @@ sub test_request {
             $pa = Perinci::Access::InProcess->new(%{$args{object_opts}});
         } else {
             unless ($pa_cached) {
-                $pa_cached = Perinci::Access::InProcess->new(load=>0);
+                $pa_cached = Perinci::Access::InProcess->new();
             }
             $pa = $pa_cached;
         }
