@@ -165,8 +165,9 @@ sub _load_module {
     my ($self, $req) = @_;
 
     my $pkg = $req->{-perl_package};
+
     # there is no module to load, or we are instructed not to load any modules.
-    return if !$pkg || !$self->{load} || package_exists($pkg);
+    return if !$pkg || !$self->{load};
 
     my $module_p = $pkg;
     $module_p =~ s!::!/!g;
@@ -182,10 +183,17 @@ sub _load_module {
     my $res;
     {
         my $fullpath = module_or_prefix_path($module_p);
+
+        # when the module path does not exist, but the package does, we can
+        # ignore this error. for example: main, CORE, etc.
+        my $pkg_exists = package_exists($pkg);
+
         if (!$fullpath) {
+            last if $pkg_exists;
             $res = [404, "Can't find module or prefix path for package $pkg"];
             last;
         } elsif ($fullpath !~ /\.pm$/) {
+            last if $pkg_exists;
             $res = [405, "Can only find a prefix path for package $pkg"];
             last;
         }
@@ -202,6 +210,13 @@ sub _load_module {
     }
     $negcache{$module_p} = $res if $res;
     return $res;
+}
+
+sub _load_module_ignore_missing {
+    my ($self, $req) = @_;
+    my $res = $self->_load_module($req);
+    return $res if $res && $res->[0] != 404 && $res->[0] != 405;
+    return;
 }
 
 sub _get_code_and_meta {
@@ -347,8 +362,8 @@ sub action_info {
         uri  => $req->{uri}->as_string,
         type => $req->{-type},
     };
-    if ($req->{-type} eq 'package' && $req->{-perl_package}) {
-        my $res2 = $self->_load_module($req);
+    if ($req->{-perl_package}) {
+        my $res2 = $self->_load_module_ignore_missing($req);
         return $res2 if $res2;
         no strict 'refs';
         $res->{entity_v} //= ${ "$req->{-perl_package}\::VERSION" };
@@ -430,11 +445,8 @@ sub action_list {
         }
     }
 
-    my $res = $self->_load_module($req);
-    # ignore missing modules
-    if ($res && $res->[0] != 404 && $res->[0] != 405) {
-        return $res;
-    }
+    my $res = $self->_load_module_ignore_missing($req);
+    return $res if $res;
 
     # get all entities from this module
     no strict 'refs';
