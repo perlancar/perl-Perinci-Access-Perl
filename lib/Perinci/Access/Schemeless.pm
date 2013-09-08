@@ -1,4 +1,4 @@
-package Perinci::Access::InProcess;
+package Perinci::Access::Schemeless;
 
 use 5.010001;
 use strict;
@@ -12,7 +12,7 @@ use Scalar::Util qw(blessed reftype);
 use SHARYANTO::ModuleOrPrefix::Path qw(module_or_prefix_path);
 use SHARYANTO::Package::Util qw(package_exists);
 use Tie::Cache;
-use URI;
+use URI::Split qw(uri_split uri_join);
 
 # VERSION
 
@@ -68,6 +68,9 @@ sub new {
     #$self->{after_load}
     #$self->{allow_paths}
     #$self->{deny_paths}
+    #$self->{allow_schemes}
+    #$self->{deny_schemes}
+    #$self->{package_prefix}
 
     # convert {allow,deny}_paths to array of regex to avoid reconstructing regex
     # on each request
@@ -75,6 +78,15 @@ sub new {
         next unless defined $pp;
         $pp = [$pp] unless ref($pp) eq 'ARRAY';
         for (@$pp) {
+            $_ = qr#\A\Q$_\E(?:/|\z)# unless ref($_) eq 'Regexp';
+        }
+    }
+
+    # ditto
+    for my $ss ($self->{allow_schemes}, $self->{deny_schemes}) {
+        next unless defined $ss;
+        $ss = [$ss] unless ref($ss) eq 'ARRAY';
+        for (@$ss) {
             $_ = qr#\A\Q$_\E(?:/|\z)# unless ref($_) eq 'Regexp';
         }
     }
@@ -93,7 +105,7 @@ sub new {
 # for older Perinci::Access::Base 0.28-, to remove later
 sub _init {}
 
-sub __match_path {
+sub __match_list {
     my ($path, $paths) = @_;
 
     for my $p (@$paths) {
@@ -105,35 +117,41 @@ sub __match_path {
 sub _parse_uri {
     my ($self, $req) = @_;
 
-    my $path = $req->{uri}->path || "/";
-
-    # TODO: do some normalization on paths, allow this to be optional if eats
-    # too much cycles
-
+    my $path = $req->{-uri_path};
     if (defined($self->{allow_paths}) &&
-            !__match_path($path, $self->{allow_paths})) {
+            !__match_list($path, $self->{allow_paths})) {
         return [403, "Forbidden uri path (does not match allow_paths)"];
     }
     if (defined($self->{deny_paths}) &&
-            __match_path($path, $self->{deny_paths})) {
+            __match_list($path, $self->{deny_paths})) {
         return [403, "Forbidden uri path (matches deny_paths)"];
     }
 
+    my $sch = $req->{-uri_scheme} // "";
+    if (defined($self->{allow_schemes}) &&
+            !__match_list($sch, $self->{allow_schemes})) {
+        return [502, "Unsupported uri scheme (does not match allow_schemes)"];
+    }
+    if (defined($self->{deny_schemes}) &&
+            __match_list($sch, $self->{deny_schemes})) {
+        return [502, "Unsupported uri scheme (matches deny_schemes)"];
+    }
+
     my ($dir, $leaf, $perl_package);
-    if ($path =~ m!\A/(.+)/+(.*)\z!) {
+    if ($path =~ m!(.+)/(.*)!) {
         $dir  = $1;
         $leaf = $2;
-    } elsif ($path =~ m!\A/+(.+)\z!) {
-        $dir  = '/';
-        $leaf = $1;
     } else {
-        $dir = '/';
+        $dir  = $path;
         $leaf = '';
     }
     for ($perl_package) {
         $_ = $dir;
-        s!\A/+!!;
+        s!^/+!!;
         s!/+!::!g;
+        if (defined $self->{package_prefix}) {
+            $_ = "$self->{package_prefix}$_";
+        }
     }
     return [400, "Invalid uri"]
         if $perl_package && $perl_package !~ $re_perl_package;
@@ -149,12 +167,12 @@ sub _parse_uri {
         $type = 'package';
     }
 
-    $req->{-uri_path}     = $path;
     $req->{-uri_dir}      = $dir;
     $req->{-uri_leaf}     = $leaf;
     $req->{-perl_package} = $perl_package;
     $req->{-type}         = $type;
 
+    #$log->tracef("TMP: req=%s", $req);
     return;
 }
 
@@ -319,16 +337,14 @@ sub request {
 
     my ($self, $action, $uri, $extra) = @_;
 
-    my $req = { action=>$action, %{$extra // {}} };
+    return [400, "Please specify URI"] unless $uri;
+
+    my $req = { action=>$action, uri=>$uri, %{$extra // {}} };
     my $res = $self->check_request($req);
     return $res if $res;
 
     my $am = $self->{_actionmetas}{$action};
     return [502, "Action '$action' not implemented"] unless $am;
-
-    return [400, "Please specify URI"] unless $uri;
-    $uri = URI->new($uri) unless blessed($uri);
-    $req->{uri} = $uri;
 
     $res = $self->_parse_uri($req);
     return $res if $res;
@@ -345,8 +361,12 @@ sub request {
 sub parse_url {
     my ($self, $uri) = @_;
     die "Please specify url" unless $uri;
-    $uri = URI->new($uri) unless blessed($uri);
-    {proto=>"pl", path=>$uri->path};
+    my ($sch, $auth, $path) = uri_split($uri);
+    return {
+        # to mark that we are schemeless
+        proto=>'',
+        path=>$path,
+    };
 }
 
 sub actionmeta_info { +{
@@ -364,7 +384,7 @@ sub action_info {
 
     my $res = {
         v    => 1.1,
-        uri  => $req->{uri}->as_string,
+        uri  => $req->{uri},
         type => $req->{-type},
     };
 
@@ -413,11 +433,11 @@ sub action_list {
     my $filter_path = sub {
         my $path = shift;
         if (defined($self->{allow_paths}) &&
-                !__match_path($path, $self->{allow_paths})) {
+                !__match_list($path, $self->{allow_paths})) {
             return 0;
         }
         if (defined($self->{deny_paths}) &&
-                __match_path($path, $self->{deny_paths})) {
+                __match_list($path, $self->{deny_paths})) {
             return 0;
         }
         1;
@@ -426,6 +446,8 @@ sub action_list {
     # TODO: if load=0, then instead of using list_modules(), use list_packages()
     # instead and skip the filesystem.
 
+    my %mem;
+
     # get submodules
     unless ($f_type && $f_type ne 'package') {
         my $lres = Module::List::list_modules(
@@ -433,13 +455,12 @@ sub action_list {
             {list_modules=>1, list_prefixes=>1});
         my $p0 = $req->{-uri_path};
         $p0 =~ s!/+$!!;
-        my %mem;
         for my $m (sort keys %$lres) {
             $m =~ s!::$!!;
             $m =~ s!.+::!!;
             my $path = join("", $p0, "/", $m, "/");
             next unless $filter_path->($path);
-            my $uri = "pl:$path";
+            my $uri = uri_join($req->{-uri_scheme}, $req->{-uri_auth}, $path);
             next if $mem{$uri}++;
             if ($detail) {
                 push @res, {uri=>$uri, type=>"package"};
@@ -460,7 +481,8 @@ sub action_list {
         next if /^:/;
         my $path = join("", $base, $_);
         next unless $filter_path->($path);
-        my $uri = "pl:$path";
+        my $uri = uri_join($req->{-uri_scheme}, $req->{-uri_auth}, $path);
+        next if $mem{$uri}++;
         my $t = $_ =~ /^[%\@\$]/ ? 'variable' : 'function';
         next if $f_type && $f_type ne $t;
         if ($detail) {
@@ -862,74 +884,20 @@ sub action_discard_all_txs {
 }
 
 1;
-# ABSTRACT: Use Rinci access protocol (Riap) to access Perl code
+# ABSTRACT: Base class for Perinci::Access::Perl
 
 =for Pod::Coverage ^(actionmeta_.+|action_.+|get_(meta|code))$
 
-=head1 SYNOPSIS
-
- # in Your/Module.pm
-
- package My::Module;
- our %SPEC;
-
- $SPEC{mult2} = {
-     v => 1.1,
-     summary => 'Multiple two numbers',
-     args => {
-         a => { schema=>'float*', req=>1, pos=>0 },
-         b => { schema=>'float*', req=>1, pos=>1 },
-     },
-     examples => [
-         {args=>{a=>2, b=>3}, result=>6},
-     ],
- };
- sub mult2 {
-     my %args = @_;
-     [200, "OK", $args{a} * $args{b}];
- }
-
- $SPEC{multn} = {
-     v => 1.1,
-     summary => 'Multiple many numbers',
-     args => {
-         n => { schema=>[array=>{of=>'float*'}], req=>1, pos=>0, greedy=>1 },
-     },
- };
- sub multn {
-     my %args = @_;
-     my @n = @{$args{n}};
-     my $res = 0;
-     if (@n) {
-         $res = shift(@n);
-         $res *= $_ while $_ = shift(@n);
-     }
-     return [200, "OK", $res];
- }
-
- 1;
-
- # in another file
-
- use Perinci::Access::InProcess;
- my $pa = Perinci::Access::Process->new();
-
- # list all functions in package
- my $res = $pa->request(list => '/My/Module/', {type=>'function'});
- # -> [200, "OK", ['pl:/My/Module/mult2', 'pl:/My/Module/multn']]
-
- # call function
- my $res = $pa->request(call => 'pl:/My/Module/mult2', {args=>{a=>2, b=>3}});
- # -> [200, "OK", 6]
-
- # get function metadata
- $res = $pa->request(meta => '/Foo/Bar/multn');
- # -> [200, "OK", {v=>1.1, summary=>'Multiple many numbers', ...}]
-
-
 =head1 DESCRIPTION
 
-This class implements Rinci access protocol (L<Riap>) to access local Perl code.
+This class is the base class for L<Perinci::Access::Perl>, and by default acts
+like Perinci::Access::Perl (e.g. given uri C</Foo/Bar/baz> it will refer to
+function C<baz> in Perl package C<Foo::Bar>; it also looks for Rinci metadata in
+C<%SPEC> package variables by default). But this class is designed to be
+flexible: you can override aspects of it so it can map uri to different Perl
+packages (e.g. using option like C<package_prefix)
+
+    implements Rinci access protocol (L<Riap>) to access local Perl code.
 This might seem like a long-winded and slow way to access things that are
 already accessible from Perl like functions and metadata (in C<%SPEC>). Indeed,
 if you do not need Riap, you can access your module just like any normal Perl
@@ -1087,6 +1055,16 @@ If defined, requests with C<uri> matching specified path will be denied. Like
 C<allow_paths>, value can be a string (e.g. C</spanel/api/>) or regex (e.g. C<<
 qr{^/[^/]+/api/} >>) or an array of those.
 
+=item * allow_schemes => REGEX|STR|ARRAY
+
+By default this class does not care about schemes, it only looks at the uri
+path. You can use this option to limit allowed schemes.
+
+=item * deny_schemes => REGEX|STR|ARRAY
+
+By default this class does not care about schemes, it only looks at the uri
+path. You can use this option to specify forbidden schemes.
+
 =item * use_tx => BOOL (default: 0)
 
 Whether to allow transaction requests from client. Since this can cause the
@@ -1115,27 +1093,6 @@ Process Riap request and return enveloped result. $server_url will be used as
 the Riap request key 'uri', as there is no server in this case.
 
 =head2 $pa->parse_url($server_url) => HASH
-
-
-=head1 FAQ
-
-=head2 Why wrap?
-
-The wrapping process accomplishes several things, among others: checking of
-metadata, normalization of schemas in metadata, also argument validation and
-exception trapping in function.
-
-The function wrapping introduces a small overhead when performing a sub call
-(typically around several to tens of microseconds on an Intel Core i5 1.7GHz
-notebook). This is usually smaller than the overhead of
-Perinci::Access::InProcess itself (typically in the range of 100 microseconds).
-But if you are concerned about the wrapping overhead, see the C<use_wrapped_sub>
-option.
-
-
-=head2 Why %SPEC?
-
-The name was first chosen when during Sub::Spec era, so it stuck.
 
 
 =head1 SEE ALSO
