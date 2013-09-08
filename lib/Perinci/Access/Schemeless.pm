@@ -318,7 +318,7 @@ sub get_meta {
         return $res;
     }
     $req->{-meta} = $res->[2][1];
-    $req->{-orig_meta} = $res->[3]{orig_meta};
+    $req->{-orig_meta} = $res->[2][2]{orig_meta};
     return;
 }
 
