@@ -4,7 +4,9 @@ Revision history for Perinci-Access-Perl
 
          - Rename distribution from Perinci-Access-InProcess to
            Perinci-Access-Perl, split Perinci::Access::InProcess to ::Perl and
-           ::Schemeless as its superclass.
+           ::Schemeless as its superclass. This clears up some things, mainly
+           that pl:/Foo/Bar/ must point to Foo::Bar perl package so things like
+           package_prefix are moved to Schemeless.
 
 
 0.47     2013-09-07 (SHARYANTO)

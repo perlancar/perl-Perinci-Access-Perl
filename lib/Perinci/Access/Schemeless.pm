@@ -895,13 +895,8 @@ like Perinci::Access::Perl (e.g. given uri C</Foo/Bar/baz> it will refer to
 function C<baz> in Perl package C<Foo::Bar>; it also looks for Rinci metadata in
 C<%SPEC> package variables by default). But this class is designed to be
 flexible: you can override aspects of it so it can map uri to different Perl
-packages (e.g. using option like C<package_prefix)
-
-    implements Rinci access protocol (L<Riap>) to access local Perl code.
-This might seem like a long-winded and slow way to access things that are
-already accessible from Perl like functions and metadata (in C<%SPEC>). Indeed,
-if you do not need Riap, you can access your module just like any normal Perl
-module.
+packages (e.g. using option like C<package_prefix>), you can retrieve Rinci
+metadata from a database or whatever, etc.
 
 Supported features:
 
@@ -961,8 +956,8 @@ object.
 User calls C<< $pa->request($action => $uri, \%extras) >>. Internally, the
 method creates a hash C<$req> which contains Riap request keys as well as
 internal information about the Riap request (the latter will be prefixed with
-dash C<->). Initially it will contain C<action> and C<uri> (converted to L<URI>
-object) and the C<%extras> keys from the request() arguments sent by the user.
+dash C<->). Initially it will contain C<action> and C<uri> and the C<%extras>
+keys from the request() arguments sent by the user.
 
 Internal C<_parse_uri()> method will be called to parse C<uri> into C<-uri_dir>
 (the "dir" part), C<-uri_leaf> (the "basename" part), and C<-perl_package>.
