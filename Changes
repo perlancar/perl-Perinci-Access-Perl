@@ -1,6 +1,13 @@
 Revision history for Perinci-Access-Perl
 
-0.48     2013-09-08 (SHARYANTO) (not yet released)
+0.49     2013-09-08 (SHARYANTO)
+
+         [BUG FIXES]
+
+         - 'meta' action returned empty orig_meta.
+
+
+0.48     2013-09-08 (SHARYANTO)
 
          - Rename distribution from Perinci-Access-InProcess to
            Perinci-Access-Perl, split Perinci::Access::InProcess to ::Perl and
