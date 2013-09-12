@@ -196,7 +196,9 @@ sub _load_module {
     return if $INC{$module_p};
 
     # module has been required before and failed
-    return [500, "Module $pkg has failed to load previously"]
+    return [500, "Module $pkg has failed to load previously" .
+                $loadcache{$module_p} ?
+                    ": $loadcache{$module_p}[0] - $loadcache{$module_p}[1]":""]
         if exists($INC{$module_p});
 
     # use cache result (for caching errors, or packages like 'main' and 'CORE'
