@@ -8,6 +8,7 @@ use Log::Any '$log';
 use parent qw(Perinci::Access::Base);
 
 use Perinci::Object;
+use Perinci::Sub::Util qw(err);
 use Scalar::Util qw(blessed reftype);
 use SHARYANTO::ModuleOrPrefix::Path qw(module_or_prefix_path);
 use SHARYANTO::Package::Util qw(package_exists);
@@ -120,21 +121,22 @@ sub _parse_uri {
     my $path = $req->{-uri_path};
     if (defined($self->{allow_paths}) &&
             !__match_list($path, $self->{allow_paths})) {
-        return [403, "Forbidden uri path (does not match allow_paths)"];
+        return err(403, "Forbidden uri path (does not match allow_paths)");
     }
     if (defined($self->{deny_paths}) &&
             __match_list($path, $self->{deny_paths})) {
-        return [403, "Forbidden uri path (matches deny_paths)"];
+        return err(403, "Forbidden uri path (matches deny_paths)");
     }
 
     my $sch = $req->{-uri_scheme} // "";
     if (defined($self->{allow_schemes}) &&
             !__match_list($sch, $self->{allow_schemes})) {
-        return [502, "Unsupported uri scheme (does not match allow_schemes)"];
+        return err(502,
+                   "Unsupported uri scheme (does not match allow_schemes)");
     }
     if (defined($self->{deny_schemes}) &&
             __match_list($sch, $self->{deny_schemes})) {
-        return [502, "Unsupported uri scheme (matches deny_schemes)"];
+        return err(502, "Unsupported uri scheme (matches deny_schemes)");
     }
 
     my ($dir, $leaf, $perl_package);
@@ -153,7 +155,7 @@ sub _parse_uri {
             $_ = "$self->{package_prefix}$_";
         }
     }
-    return [400, "Invalid uri"]
+    return err(400, "Invalid uri")
         if $perl_package && $perl_package !~ $re_perl_package;
 
     my $type;
@@ -196,9 +198,10 @@ sub _load_module {
     return if $INC{$module_p};
 
     # module has been required before and failed
-    return [500, "Module $pkg has failed to load previously" .
-                $loadcache{$module_p} ?
-                    ": $loadcache{$module_p}[0] - $loadcache{$module_p}[1]":""]
+    return err(500, "Module $pkg has failed to load previously" .
+                   $loadcache{$module_p} ?
+                       ": $loadcache{$module_p}[0] - $loadcache{$module_p}[1]" :
+                           "")
         if exists($INC{$module_p});
 
     # use cache result (for caching errors, or packages like 'main' and 'CORE'
@@ -261,14 +264,14 @@ sub _get_code_and_meta {
         $meta = {v=>1.1};
     }
 
-    return [404, "No metadata for $name"] unless $meta;
+    return err(404, "No metadata for $name") unless $meta;
 
     my $code;
     my $extra = {};
     if ($req->{-type} eq 'function') {
         $code = \&{$name};
-        return [404, "Can't find function $req->{-uri_leaf} in ".
-                    "module $req->{-perl_package}"]
+        return err(404, "Can't find function $req->{-uri_leaf} in ".
+                       "module $req->{-perl_package}")
             unless defined &{$name};
         if ($self->{wrap}) {
             my $wres = Perinci::Sub::Wrapper::wrap_sub(
@@ -279,7 +282,7 @@ sub _get_code_and_meta {
                     args_as=>'hash', result_naked=>0,
                     %{$self->{extra_wrapper_convert}},
                 });
-            return [500, "Can't wrap function: $wres->[0] - $wres->[1]"]
+            return err(500, "Can't wrap function", $wres)
                 unless $wres->[0] == 200;
             $code = $wres->[2]{sub};
             $extra->{orig_meta} = {
@@ -339,20 +342,20 @@ sub request {
 
     my ($self, $action, $uri, $extra) = @_;
 
-    return [400, "Please specify URI"] unless $uri;
+    return err(400, "Please specify URI") unless $uri;
 
     my $req = { action=>$action, uri=>$uri, %{$extra // {}} };
     my $res = $self->check_request($req);
     return $res if $res;
 
     my $am = $self->{_actionmetas}{$action};
-    return [502, "Action '$action' not implemented"] unless $am;
+    return err(502, "Action '$action' not implemented") unless $am;
 
     $res = $self->_parse_uri($req);
     return $res if $res;
 
-    return [502, "Action '$action' not implemented for ".
-                "'$req->{-type}' entity"]
+    return err(502, "Action '$action' not implemented for ".
+                   "'$req->{-type}' entity")
         unless $self->{_typeacts}{ $req->{-type} }{ $action };
 
     my $meth = "action_$action";
@@ -542,7 +545,7 @@ sub action_call {
     my $risub = risub($meta);
 
     if ($req->{dry_run}) {
-        return [412, "Function does not support dry run"]
+        return err(412, "Function does not support dry run")
             unless $risub->can_dry_run;
         if ($risub->feature('dry_run')) {
             $args{-dry_run} = 1;
@@ -580,14 +583,15 @@ sub actionmeta_complete_arg_val { +{
 
 sub action_complete_arg_val {
     my ($self, $req) = @_;
-    my $arg = $req->{arg} or return [400, "Please specify arg"];
+    my $arg = $req->{arg} or return err(400, "Please specify arg");
     my $word = $req->{word} // "";
 
     my $res = $self->_get_code_and_meta($req);
     return $res unless $res->[0] == 200;
     my (undef, $meta) = @{$res->[2]};
     my $args_p = $meta->{args} // {};
-    my $arg_p = $args_p->{$arg} or return [400, "Unknown function arg '$arg'"];
+    my $arg_p = $args_p->{$arg}
+        or return err(400, "Unknown function arg '$arg'");
 
     my $words;
     eval { # completion sub can die, etc.
@@ -638,7 +642,7 @@ sub action_complete_arg_val {
 
         $words = [];
     };
-    return [500, "Completion died: $@"] if $@;
+    return err(500, "Completion died: $@") if $@;
 
     [200, "OK", [grep /^\Q$word\E/, @$words]];
 }
@@ -680,7 +684,7 @@ sub action_get {
 
     # extract prefix
     $req->{-uri_leaf} =~ s/^([%\@\$])//
-        or return [500, "BUG: Unknown variable prefix"];
+        or return err(500, "BUG: Unknown variable prefix");
     my $prefix = $1;
     my $name = $req->{-perl_package} . "::" . $req->{-uri_leaf};
     my $res =
@@ -694,7 +698,7 @@ sub action_get {
 sub _pre_tx_action {
     my ($self, $req) = @_;
 
-    return [501, "Transaction not supported by server"]
+    return err(501, "Transaction not supported by server")
         unless $self->{use_tx};
 
     # instantiate custom tx manager, per request if necessary
@@ -703,8 +707,8 @@ sub _pre_tx_action {
             $self->{_tx_manager} = $self->{custom_tx_manager}->($self);
             die $self->{_tx_manager} unless blessed($self->{_tx_manager});
         };
-        return [500, "Can't initialize custom tx manager: ".
-                    "$self->{_tx_manager}: $@"] if $@;
+        return err(500, "Can't initialize custom tx manager: ".
+                       "$self->{_tx_manager}: $@") if $@;
     } elsif (!blessed($self->{_tx_manager})) {
         my $tm_cl = $self->{custom_tx_manager} // "Perinci::Tx::Manager";
         my $tm_cl_p = $tm_cl; $tm_cl_p =~ s!::!/!g; $tm_cl_p .= ".pm";
@@ -713,7 +717,7 @@ sub _pre_tx_action {
             $self->{_tx_manager} = $tm_cl->new(pa => $self);
             die $self->{_tx_manager} unless blessed($self->{_tx_manager});
         };
-        return [500, "Can't initialize tx manager ($tm_cl): $@"] if $@;
+        return err(500, "Can't initialize tx manager ($tm_cl): $@") if $@;
         # we just want to force newer version, we currently can't specify this
         # in Makefile.PL because peritm's tests use us. this might be rectified
         # in the future.
