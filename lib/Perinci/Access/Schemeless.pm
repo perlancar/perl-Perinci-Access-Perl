@@ -242,8 +242,6 @@ sub _load_module {
 }
 
 sub _get_code_and_meta {
-    require Perinci::Sub::Wrapper;
-
     no strict 'refs';
     my ($self, $req) = @_;
     my $name = $req->{-perl_package} . "::" . $req->{-uri_leaf};
@@ -274,6 +272,7 @@ sub _get_code_and_meta {
                        "module $req->{-perl_package}")
             unless defined &{$name};
         if ($self->{wrap}) {
+            require Perinci::Sub::Wrapper;
             my $wres = Perinci::Sub::Wrapper::wrap_sub(
                 sub=>$code, sub_name=>$name, meta=>$meta,
                 forbid_tags => ['die'],
