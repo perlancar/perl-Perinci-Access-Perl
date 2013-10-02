@@ -1,5 +1,12 @@
 Revision history for Perinci-Access-Perl
 
+0.50     2013-10-02 (SHARYANTO) (not yet released)
+
+         - use err().
+
+         - Add option: disk_cache (default: 0) to cache wrap result to disk.
+
+
 0.49     2013-09-08 (SHARYANTO)
 
          [BUG FIXES]

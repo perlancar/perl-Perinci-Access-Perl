@@ -60,6 +60,7 @@ sub new {
     $self->{_typeacts} = \%typeacts;
 
     $self->{cache_size}            //= 100;
+    $self->{disk_cache}            //= 0;
     $self->{use_tx}                //= 0;
     $self->{wrap}                  //= 1;
     $self->{custom_tx_manager}     //= undef;
@@ -241,6 +242,20 @@ sub _load_module {
     return $res;
 }
 
+sub _get_cache_path {
+    my ($self, $name, $hash_source, $req) = @_;
+
+    require File::Spec;
+    my $dir = File::Spec->tmpdir;
+
+    require Data::Dumper;
+    require Digest::MD5;
+    my $hash = Digest::MD5::md5_hex(Data::Dumper::Dumper($hash_source));
+
+    my $fname = "$name.$hash.wrapcache";
+    sprintf("%s/%s", $dir, $fname);
+}
+
 sub _get_code_and_meta {
     no strict 'refs';
     my ($self, $req) = @_;
@@ -267,33 +282,75 @@ sub _get_code_and_meta {
     my $code;
     my $extra = {};
     if ($req->{-type} eq 'function') {
-        $code = \&{$name};
         return err(404, "Can't find function $req->{-uri_leaf} in ".
                        "module $req->{-perl_package}")
             unless defined &{$name};
-        if ($self->{wrap}) {
+
+        my $cache_path;
+        my $wrapres;
+      GET_CODE:
+        {
+            if (!$self->{wrap}) {
+                $code = \&{$name};
+                last GET_CODE;
+            }
+
+            # try to find wrap result cache in disk
+            if ($self->{disk_cache}) {
+                $cache_path = $self->_get_cache_path(
+                    $name, [$self->{extra_wrapper_args},
+                            $self->{extra_wrapper_convert}]);
+                # XXX perhaps check if cache is stale, probably determined using
+                # a fixed expiry period and/or by comparing current version of
+                # Perinci::Sub::Wrapper with the version used to generate the
+                # wrapper code.
+                if (-f $cache_path) {
+                    my $res;
+                    $res = do $cache_path;
+                    return err(500, "Can't load disk cache '$cache_path': $@")
+                        if $@;
+                    $code = $res->[0];
+                    $meta = $res->[1];
+                    last GET_CODE;
+                }
+            }
+
             require Perinci::Sub::Wrapper;
-            my $wres = Perinci::Sub::Wrapper::wrap_sub(
-                sub=>$code, sub_name=>$name, meta=>$meta,
+            $wrapres = Perinci::Sub::Wrapper::wrap_sub(
+                sub_name=>$name, meta=>$meta,
                 forbid_tags => ['die'],
                 %{$self->{extra_wrapper_args}},
                 convert=>{
                     args_as=>'hash', result_naked=>0,
                     %{$self->{extra_wrapper_convert}},
                 });
-            return err(500, "Can't wrap function", $wres)
-                unless $wres->[0] == 200;
-            $code = $wres->[2]{sub};
+            return err(500, "Can't wrap function", $wrapres)
+                unless $wrapres->[0] == 200;
+            $code = $wrapres->[2]{sub};
             $extra->{orig_meta} = {
                 # store some info about the old meta, no need to store all for
                 # efficiency
                 result_naked=>$meta->{result_naked},
                 args_as=>$meta->{args_as},
             };
-            $meta = $wres->[2]{meta};
+            $meta = $wrapres->[2]{meta};
         }
+
         $self->{_cache}{$name} = [$code, $meta, $extra]
             if $self->{cache_size};
+        if ($wrapres && $cache_path) {
+            open my($fh), ">", $cache_path;
+            {
+                local $Data::Dumper::Deparse = 1;
+                local $Data::Dumper::Purity = 1;
+                local $Data::Dumper::Terse = 1;
+                local $Data::Dumper::Indent = 0;
+                print $fh "[do{$wrapres->[2]{source}}, ".
+                    Data::Dumper::Dumper($meta) . "];\n";
+            }
+            close $fh;
+            chmod 0600, $cache_path;
+        }
     }
     unless (defined $meta->{entity_v}) {
         my $ver = ${ $req->{-perl_package} . "::VERSION" };
@@ -1037,11 +1094,28 @@ This is only relevant if you enable C<wrap>.
 =item * cache_size => INT (default: 100)
 
 Specify cache size (in number of items). Cache saves the result of function
-wrapping so future requests to the same function need not involve wrapping
-again. Setting this to 0 disables caching.
+wrapping in memory using L<Tie::Cache> so future requests to the same function
+need not involve wrapping again. Setting this to 0 disables caching.
 
 Caching is implemented inside C<get_meta()> and C<get_code()> so you might want
 to implement your own caching if you override those.
+
+See also: C<disk_cache>
+
+=item * disk_cache => BOOL (default: 0)
+
+Whether to cache function wrapping result to disk, to shave startup overhead for
+the next invocation of program. Useful for one-off programs like command-line
+scripts (see L<Perinci::CmdLine>) that get invoked often; not really useful for
+long-running programs (e.g. daemons).
+
+Currently wrapping result is cached in C<<
+$TMPDIR/Package::SubPackage::funcname.$HASH.wrapcache >> where C<$HASH> is
+calculated from C<extra_wrapper_args> and C<extra_wrapper_convert>.
+
+See also: C<cache_size>
+
+TODO: C<disk_cache_path>
 
 =item * allow_paths => REGEX|STR|ARRAY
 
