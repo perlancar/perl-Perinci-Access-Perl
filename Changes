@@ -1,5 +1,10 @@
 Revision history for Perinci-Access-Perl
 
+0.52     2013-10-03 (SHARYANTO)
+
+         - No functional changes. Avoid perl undef warning.
+
+
 0.51     2013-10-03 (SHARYANTO)
 
          - wrap cache file: check for staleness.
