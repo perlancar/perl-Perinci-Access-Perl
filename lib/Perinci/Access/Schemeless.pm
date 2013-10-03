@@ -351,13 +351,22 @@ sub _get_code_and_meta {
             if $self->{cache_size};
         if ($wrapres && $cache_path) {
             open my($fh), ">", $cache_path;
+            $self->{use_utf8} = 1; # TMP
+            binmode($fh, ":utf8") if $self->{use_utf8};
             {
                 local $Data::Dumper::Deparse = 1;
                 local $Data::Dumper::Purity = 1;
                 local $Data::Dumper::Terse = 1;
                 local $Data::Dumper::Indent = 0;
-                print $fh "[do{$wrapres->[2]{source}}, ".
-                    Data::Dumper::Dumper($meta) . "];\n";
+                print $fh join(
+                    "",
+                    ($self->{use_utf8} ? "use utf8;" : ""),
+                    "[do{",
+                    $wrapres->[2]{source},
+                    ", ",
+                    Data::Dumper::Dumper($meta),
+                    "}];\n",
+                );
             }
             close $fh;
             chmod 0600, $cache_path;
