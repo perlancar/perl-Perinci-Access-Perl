@@ -1,5 +1,15 @@
 Revision history for Perinci-Access-Perl
 
+0.51     2013-10-03 (SHARYANTO)
+
+         - wrap cache file: check for staleness.
+
+         - wrap cache file: create legal filename for Windows (no ':').
+
+         - wrap cache file: option to output UTF-8 ('use_utf8' attribute,
+           currently undocumented).
+
+
 0.50     2013-10-02 (SHARYANTO)
 
          - use err().
