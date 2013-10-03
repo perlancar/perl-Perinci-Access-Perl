@@ -195,6 +195,8 @@ sub _load_module {
     $module_p =~ s!::!/!g;
     $module_p .= ".pm";
 
+    $req->{-module_p} = $module_p; # for convenience of _get_cache_path
+
     # module has been required before and successfully loaded
     return if $INC{$module_p};
 
@@ -239,7 +241,6 @@ sub _load_module {
         }
     }
     $loadcache{$module_p} = $res;
-    $req->{-module_p} = $module_p; # for convenience of _get_cache_path
     return $res;
 }
 
