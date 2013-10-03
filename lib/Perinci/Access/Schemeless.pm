@@ -260,6 +260,7 @@ sub _get_cache_path {
     my $hash = Digest::MD5::md5_hex(
         Data::Dumper::Dumper($hash_source) . $file_md5);
 
+    $name =~ s/::/./g; # for windows
     my $fname = "$name.$hash.wrapcache";
     sprintf("%s/%s", $dir, $fname);
 }
