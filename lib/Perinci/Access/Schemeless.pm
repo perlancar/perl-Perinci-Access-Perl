@@ -239,6 +239,7 @@ sub _load_module {
         }
     }
     $loadcache{$module_p} = $res;
+    $req->{-module_p} = $module_p; # for convenience of _get_cache_path
     return $res;
 }
 
@@ -250,7 +251,14 @@ sub _get_cache_path {
 
     require Data::Dumper;
     require Digest::MD5;
-    my $hash = Digest::MD5::md5_hex(Data::Dumper::Dumper($hash_source));
+    my $file_md5;
+    {
+        local $/;
+        open my($fh), $INC{$req->{-module_p}} // $0;
+        $file_md5 = Digest::MD5::md5_hex(~~<$fh>);
+    }
+    my $hash = Digest::MD5::md5_hex(
+        Data::Dumper::Dumper($hash_source) . $file_md5);
 
     my $fname = "$name.$hash.wrapcache";
     sprintf("%s/%s", $dir, $fname);
@@ -295,26 +303,28 @@ sub _get_code_and_meta {
                 last GET_CODE;
             }
 
-            # try to find wrap result cache in disk
-            if ($self->{disk_cache}) {
-                $cache_path = $self->_get_cache_path(
-                    $name, [$self->{extra_wrapper_args},
-                            $self->{extra_wrapper_convert}]);
-                # XXX perhaps check if cache is stale, probably determined using
-                # a fixed expiry period and/or by comparing current version of
-                # Perinci::Sub::Wrapper with the version used to generate the
-                # wrapper code.
-                if (-f $cache_path) {
-                    my $res;
-                    $res = do $cache_path;
-                    return err(500, "Can't load disk cache '$cache_path': $@")
-                        if $@;
-                    $code = $res->[0];
-                    $meta = $res->[1];
-                    last GET_CODE;
-                }
-            }
+            goto NOT_CACHE if !$self->{disk_cache};
 
+            $cache_path = $self->_get_cache_path(
+                $name, [$self->{extra_wrapper_args},
+                        $self->{extra_wrapper_convert}], $req);
+
+            goto NOT_CACHE unless -f $cache_path;
+
+            # expire after 24h, for other factors that might make cache stale,
+            # like updated Perinci::Sub::Wrapper version, etc.
+            goto NOT_CACHE if (-M $cache_path) >= 1;
+
+            $log->tracef("Using wrap cache %s ...", $cache_path);
+            my $res;
+            $res = do $cache_path;
+            return err(500, "Can't load disk cache '$cache_path': $@")
+                if $@;
+            $code = $res->[0];
+            $meta = $res->[1];
+            last GET_CODE;
+
+          NOT_CACHE:
             require Perinci::Sub::Wrapper;
             $wrapres = Perinci::Sub::Wrapper::wrap_sub(
                 sub_name=>$name, meta=>$meta,
