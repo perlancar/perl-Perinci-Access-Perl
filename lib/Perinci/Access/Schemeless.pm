@@ -59,8 +59,7 @@ sub new {
     }
     $self->{_typeacts} = \%typeacts;
 
-    $self->{cache_size}            //= 100;
-    $self->{disk_cache}            //= 0;
+    $self->{cache_size}            //= 100; # for caching wrap result in memory
     $self->{use_tx}                //= 0;
     $self->{wrap}                  //= 1;
     $self->{custom_tx_manager}     //= undef;
@@ -91,14 +90,6 @@ sub new {
         for (@$ss) {
             $_ = qr#\A\Q$_\E(?:/|\z)# unless ref($_) eq 'Regexp';
         }
-    }
-
-    # to cache wrapped result
-    if ($self->{cache_size}) {
-        tie my(%cache), 'Tie::Cache', $self->{cache_size};
-        $self->{_cache} = \%cache;
-    } else {
-        $self->{_cache} = {};
     }
 
     $self;
@@ -195,8 +186,6 @@ sub _load_module {
     $module_p =~ s!::!/!g;
     $module_p .= ".pm";
 
-    $req->{-module_p} = $module_p; # for convenience of _get_cache_path
-
     # module has been required before and successfully loaded
     return if $INC{$module_p};
 
@@ -244,28 +233,6 @@ sub _load_module {
     return $res;
 }
 
-sub _get_cache_path {
-    my ($self, $name, $hash_source, $req) = @_;
-
-    require File::Spec;
-    my $dir = File::Spec->tmpdir;
-
-    require Data::Dumper;
-    require Digest::MD5;
-    my $file_md5;
-    {
-        local $/;
-        open my($fh), $INC{$req->{-module_p}} // $0;
-        $file_md5 = Digest::MD5::md5_hex(~~<$fh>);
-    }
-    my $hash = Digest::MD5::md5_hex(
-        Data::Dumper::Dumper($hash_source) . $file_md5);
-
-    $name =~ s/::/./g; # for windows
-    my $fname = "$name.$hash.wrapcache";
-    sprintf("%s/%s", $dir, $fname);
-}
-
 sub _get_code_and_meta {
     no strict 'refs';
     my ($self, $req) = @_;
@@ -296,7 +263,6 @@ sub _get_code_and_meta {
                        "module $req->{-perl_package}")
             unless defined &{$name};
 
-        my $cache_path;
         my $wrapres;
       GET_CODE:
         {
@@ -305,28 +271,6 @@ sub _get_code_and_meta {
                 last GET_CODE;
             }
 
-            goto NOT_CACHE if !$self->{disk_cache};
-
-            $cache_path = $self->_get_cache_path(
-                $name, [$self->{extra_wrapper_args},
-                        $self->{extra_wrapper_convert}], $req);
-
-            goto NOT_CACHE unless -f $cache_path;
-
-            # expire after 24h, for other factors that might make cache stale,
-            # like updated Perinci::Sub::Wrapper version, etc.
-            goto NOT_CACHE if (-M $cache_path) >= 1;
-
-            $log->tracef("Using wrap cache %s ...", $cache_path);
-            my $res;
-            $res = do $cache_path;
-            return err(500, "Can't load disk cache '$cache_path': $@")
-                if $@;
-            $code = $res->[0];
-            $meta = $res->[1];
-            last GET_CODE;
-
-          NOT_CACHE:
             require Perinci::Sub::Wrapper;
             $wrapres = Perinci::Sub::Wrapper::wrap_sub(
                 sub_name=>$name, meta=>$meta,
@@ -350,28 +294,6 @@ sub _get_code_and_meta {
 
         $self->{_cache}{$name} = [$code, $meta, $extra]
             if $self->{cache_size};
-        if ($wrapres && $cache_path) {
-            open my($fh), ">", $cache_path;
-            $self->{use_utf8} = 1; # TMP
-            binmode($fh, ":utf8") if $self->{use_utf8};
-            {
-                local $Data::Dumper::Deparse = 1;
-                local $Data::Dumper::Purity = 1;
-                local $Data::Dumper::Terse = 1;
-                local $Data::Dumper::Indent = 0;
-                print $fh join(
-                    "",
-                    ($self->{use_utf8} ? "use utf8;" : ""),
-                    "[do{",
-                    $wrapres->[2]{source},
-                    ", ",
-                    Data::Dumper::Dumper($meta),
-                    "}];\n",
-                );
-            }
-            close $fh;
-            chmod 0600, $cache_path;
-        }
     }
     unless (defined $meta->{entity_v}) {
         my $ver = ${ $req->{-perl_package} . "::VERSION" };
@@ -1120,23 +1042,6 @@ need not involve wrapping again. Setting this to 0 disables caching.
 
 Caching is implemented inside C<get_meta()> and C<get_code()> so you might want
 to implement your own caching if you override those.
-
-See also: C<disk_cache>
-
-=item * disk_cache => BOOL (default: 0)
-
-Whether to cache function wrapping result to disk, to shave startup overhead for
-the next invocation of program. Useful for one-off programs like command-line
-scripts (see L<Perinci::CmdLine>) that get invoked often; not really useful for
-long-running programs (e.g. daemons).
-
-Currently wrapping result is cached in C<<
-$TMPDIR/Package::SubPackage::funcname.$HASH.wrapcache >> where C<$HASH> is
-calculated from C<extra_wrapper_args> and C<extra_wrapper_convert>.
-
-See also: C<cache_size>
-
-TODO: C<disk_cache_path>
 
 =item * allow_paths => REGEX|STR|ARRAY
 
