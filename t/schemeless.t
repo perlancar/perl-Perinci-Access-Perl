@@ -532,7 +532,7 @@ subtest "action: complete_arg_val" => sub {
         name => 'complete: sub die trapped',
         req => [complete_arg_val => "/Perinci/Examples/test_completion",
                 {arg=>"s3"}],
-        status => 500,
+        status => 200,
     );
 };
 

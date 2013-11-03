@@ -581,69 +581,19 @@ sub actionmeta_complete_arg_val { +{
 } }
 
 sub action_complete_arg_val {
+    require Perinci::Sub::Complete;
+
     my ($self, $req) = @_;
     my $arg = $req->{arg} or return err(400, "Please specify arg");
     my $word = $req->{word} // "";
+    my $ci = $req->{ci};
 
     my $res = $self->_get_code_and_meta($req);
     return $res unless $res->[0] == 200;
     my (undef, $meta) = @{$res->[2]};
-    my $args_p = $meta->{args} // {};
-    my $arg_p = $args_p->{$arg}
-        or return err(400, "Unknown function arg '$arg'");
-
-    my $words;
-    eval { # completion sub can die, etc.
-
-        if ($arg_p->{completion}) {
-            $words = $arg_p->{completion}(word=>$word);
-            die "Completion sub does not return array"
-                unless ref($words) eq 'ARRAY';
-            return;
-        }
-
-        my $sch = $arg_p->{schema};
-
-        my ($type, $cs) = @{$sch};
-        if ($cs->{in}) {
-            $words = $cs->{in};
-            return;
-        }
-
-        if ($type =~ /^int\*?$/) {
-            my $limit = 100;
-            if ($cs->{between} &&
-                    $cs->{between}[0] - $cs->{between}[0] <= $limit) {
-                $words = [$cs->{between}[0] .. $cs->{between}[1]];
-                return;
-            } elsif ($cs->{xbetween} &&
-                    $cs->{xbetween}[0] - $cs->{xbetween}[0] <= $limit) {
-                $words = [$cs->{xbetween}[0]+1 .. $cs->{xbetween}[1]-1];
-                return;
-            } elsif (defined($cs->{min}) && defined($cs->{max}) &&
-                         $cs->{max}-$cs->{min} <= $limit) {
-                $words = [$cs->{min} .. $cs->{max}];
-                return;
-            } elsif (defined($cs->{min}) && defined($cs->{xmax}) &&
-                         $cs->{xmax}-$cs->{min} <= $limit) {
-                $words = [$cs->{min} .. $cs->{xmax}-1];
-                return;
-            } elsif (defined($cs->{xmin}) && defined($cs->{max}) &&
-                         $cs->{max}-$cs->{xmin} <= $limit) {
-                $words = [$cs->{xmin}+1 .. $cs->{max}];
-                return;
-            } elsif (defined($cs->{xmin}) && defined($cs->{xmax}) &&
-                         $cs->{xmax}-$cs->{xmin} <= $limit) {
-                $words = [$cs->{min}+1 .. $cs->{max}-1];
-                return;
-            }
-        }
-
-        $words = [];
-    };
-    return err(500, "Completion died: $@") if $@;
-
-    [200, "OK", [grep /^\Q$word\E/, @$words]];
+    [200, "OK",
+     Perinci::Sub::Complete::complete_arg_val(meta=>$meta, word=>$word,
+                                              arg=>$arg, ci=>$ci)];
 }
 
 sub actionmeta_child_metas { +{
