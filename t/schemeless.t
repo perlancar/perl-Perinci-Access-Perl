@@ -3,6 +3,7 @@
 use 5.010;
 use strict;
 use warnings;
+use experimental 'smartmatch';
 use FindBin '$Bin';
 use lib "$Bin/lib";
 
@@ -181,7 +182,7 @@ subtest "failure in loading module" => sub {
         object_opts=>{}, # so it creates a new riap client and defeat cache
         req => [list => "/$prefix/"],
         status => 200,
-        result => ["/$prefix/Err/", "/$prefix/OK/"],
+        result => ["Err/", "OK/"],
     );
     test_request(
         name => "missing module but existing prefix is okay on info",
@@ -417,6 +418,9 @@ subtest "action: list" => sub {
         posttest => sub {
             my ($res) = @_;
             ok(@{$res->[2]} > 5, "number of results"); # safe number
+            ok("noop" ~~ @{$res->[2]}, "has entry: noop"); # testing some result
+            ok("\$Var1" ~~ @{$res->[2]}, "has entry: \$Var1"); # ditto
+            ok("Completion/" ~~ @{$res->[2]}, "has entry: Completion/"); # ditto
             ok(!ref($res->[2][0]), "record is scalar");
         },
     );
@@ -567,13 +571,13 @@ test_request(
     req => [child_metas => '/Test/Perinci/Access/Schemeless/'],
     status => 200,
     result => {
-        '/Test/Perinci/Access/Schemeless/$v1' =>
+        '$v1' =>
             {
                 v=>1.1,
                 summary=>"A variable",
                 entity_v=>1.2,
             },
-        '/Test/Perinci/Access/Schemeless/f1' =>
+        'f1' =>
             {
                 v=>1.1,
                 summary => "An example function",
@@ -587,27 +591,27 @@ test_request(
                 entity_v=>1.2,
                 features=>{},
             },
-        '/Test/Perinci/Access/Schemeless/f2' =>
+        'f2' =>
             {
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
             },
-        '/Test/Perinci/Access/Schemeless/req_confirm' =>
+        'req_confirm' =>
             {
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
                 features=>{},
             },
-        '/Test/Perinci/Access/Schemeless/dry_run' =>
+        'dry_run' =>
             {
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
                 features => {dry_run=>1},
             },
-        '/Test/Perinci/Access/Schemeless/tx' =>
+        'tx' =>
             {
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,

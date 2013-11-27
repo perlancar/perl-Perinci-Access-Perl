@@ -132,7 +132,7 @@ sub _parse_uri {
     }
 
     my ($dir, $leaf, $perl_package);
-    if ($path =~ m!(.+)/(.*)!) {
+    if ($path =~ m!(.*)/(.*)!) {
         $dir  = $1;
         $leaf = $2;
     } else {
@@ -144,10 +144,10 @@ sub _parse_uri {
         s!^/+!!;
         s!/+!::!g;
         if (defined $self->{package_prefix}) {
-            $_ = "$self->{package_prefix}$_";
+            $_ = $self->{package_prefix} . (length($_) ? "::":"") . $_;
         }
     }
-    return err(400, "Invalid uri")
+    return err(400, "Invalid perl package name: $perl_package")
         if $perl_package && $perl_package !~ $re_perl_package;
 
     my $type;
@@ -159,6 +159,8 @@ sub _parse_uri {
         }
     } else {
         $type = 'package';
+        # make sure path ends in /, to ease processing
+        $req->{-uri_path} .= "/" unless $path =~ m!/\z!;
     }
 
     $req->{-uri_dir}      = $dir;
@@ -457,19 +459,17 @@ sub action_list {
         my $lres = Module::List::list_modules(
             $req->{-perl_package} ? "$req->{-perl_package}\::" : "",
             {list_modules=>1, list_prefixes=>1});
-        my $p0 = $req->{-uri_path};
-        $p0 =~ s!/+$!!;
+        my $dir = $req->{-uri_dir};
         for my $m (sort keys %$lres) {
             $m =~ s!::$!!;
             $m =~ s!.+::!!;
-            my $path = join("", $p0, "/", $m, "/");
+            my $path = "$dir/$m/";
             next unless $filter_path->($path);
-            my $uri = uri_join($req->{-uri_scheme}, $req->{-uri_auth}, $path);
-            next if $mem{$uri}++;
+            next if $mem{$path}++;
             if ($detail) {
-                push @res, {uri=>$uri, type=>"package"};
+                push @res, {uri=>"$m/", type=>"package"};
             } else {
-                push @res, $uri;
+                push @res, "$m/";
             }
         }
     }
@@ -480,22 +480,21 @@ sub action_list {
     # get all entities from this module
     no strict 'refs';
     my $spec = \%{"$req->{-perl_package}\::SPEC"};
-    my $base = $req->{-uri_path};
-    for (sort keys %$spec) {
-        next if /^:/;
-        my $path = join("", $base, $_);
+    my $dir = $req->{-uri_dir};
+    for my $e (sort keys %$spec) {
+        next if $e =~ /^:/;
+        my $path = "$dir/$e";
         next unless $filter_path->($path);
-        my $uri = uri_join($req->{-uri_scheme}, $req->{-uri_auth}, $path);
-        next if $mem{$uri}++;
-        my $t = $_ =~ /^[%\@\$]/ ? 'variable' : 'function';
+        next if $mem{$path}++;
+        my $t = $e =~ /^[%\@\$]/ ? 'variable' : 'function';
         next if $f_type && $f_type ne $t;
         if ($detail) {
             push @res, {
                 #v=>1.1,
-                uri=>$uri, type=>$t,
+                uri=>$e, type=>$t,
             };
         } else {
-            push @res, $uri;
+            push @res, $e;
         }
     }
 
@@ -593,7 +592,7 @@ sub action_complete_arg_val {
     my (undef, $meta) = @{$res->[2]};
     [200, "OK",
      Perinci::Sub::Complete::complete_arg_val(meta=>$meta, word=>$word,
-                                              arg=>$arg, ci=>$ci)];
+                                              arg=>$arg, ci=>$ci) // []];
 }
 
 sub actionmeta_child_metas { +{
@@ -610,8 +609,11 @@ sub action_child_metas {
 
     my %res;
     my %om;
+    my $base = uri_join(
+        $req->{-uri_scheme}, $req->{-uri_auth}, $req->{-uri_dir});
+
     for my $ent (@$ents) {
-        $res = $self->request(meta => $ent);
+        $res = $self->request(meta => "$base/$ent");
         # ignore failed request
         next unless $res->[0] == 200;
         $res{$ent} = $res->[2];
