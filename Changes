@@ -1,5 +1,11 @@
 Revision history for Perinci-Access-Perl
 
+0.54     2013-11-27 (SHARYANTO)
+
+         - Now return relative URI's in list and child_metas, to be more
+           tree-like (preferred by App::riap).
+
+
 0.53     2013-11-04 (SHARYANTO)
 
          [REMOVED FEATURES]
