@@ -20,7 +20,7 @@ sub new {
     # anything fancy like that.
     delete $self->{package_prefix};
 
-    $self->{allow_schemes} = ['pl'];
+    $self->{allow_schemes} = ['pl', ''];
     $self->{deny_schemes} = undef;
 
     $self;
