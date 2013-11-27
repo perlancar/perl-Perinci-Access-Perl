@@ -3,6 +3,7 @@ package Perinci::Access::Schemeless;
 use 5.010001;
 use strict;
 use warnings;
+use experimental 'smartmatch';
 use Log::Any '$log';
 
 use parent qw(Perinci::Access::Base);
@@ -73,36 +74,23 @@ sub new {
     #$self->{deny_schemes}
     #$self->{package_prefix}
 
-    # convert {allow,deny}_paths to array of regex to avoid reconstructing regex
-    # on each request
-    for my $pp ($self->{allow_paths}, $self->{deny_paths}) {
-        next unless defined $pp;
-        $pp = [$pp] unless ref($pp) eq 'ARRAY';
-        for (@$pp) {
-            $_ = qr#\A\Q$_\E(?:/|\z)# unless ref($_) eq 'Regexp';
-        }
-    }
-
-    # ditto
-    for my $ss ($self->{allow_schemes}, $self->{deny_schemes}) {
-        next unless defined $ss;
-        $ss = [$ss] unless ref($ss) eq 'ARRAY';
-        for (@$ss) {
-            $_ = qr#\A\Q$_\E(?:/|\z)# unless ref($_) eq 'Regexp';
-        }
-    }
-
     $self;
 }
 
 # for older Perinci::Access::Base 0.28-, to remove later
 sub _init {}
 
-sub __match_list {
+sub __match_paths {
     my ($path, $paths) = @_;
 
-    for my $p (@$paths) {
-        return 1 if $path =~ $p;
+    # modifies $paths, convert array of strings to array of regexes to avoid
+    # reconstructing on each request
+    for (ref($paths) eq 'ARRAY' ? @$paths : $paths) {
+        if (ref($_) eq 'Regexp') {
+            return 1 if $path ~~ $_;
+        } else {
+            return 1 if $_ eq $path || index($_, "$path/") >= 0;
+        }
     }
     0;
 }
@@ -112,22 +100,20 @@ sub _parse_uri {
 
     my $path = $req->{-uri_path};
     if (defined($self->{allow_paths}) &&
-            !__match_list($path, $self->{allow_paths})) {
+            !__match_paths($path, $self->{allow_paths})) {
         return err(403, "Forbidden uri path (does not match allow_paths)");
     }
     if (defined($self->{deny_paths}) &&
-            __match_list($path, $self->{deny_paths})) {
+            __match_paths($path, $self->{deny_paths})) {
         return err(403, "Forbidden uri path (matches deny_paths)");
     }
 
     my $sch = $req->{-uri_scheme} // "";
-    if (defined($self->{allow_schemes}) &&
-            !__match_list($sch, $self->{allow_schemes})) {
+    if (defined($self->{allow_schemes}) && !($sch ~~ $self->{allow_schemes})) {
         return err(502,
                    "Unsupported uri scheme (does not match allow_schemes)");
     }
-    if (defined($self->{deny_schemes}) &&
-            __match_list($sch, $self->{deny_schemes})) {
+    if (defined($self->{deny_schemes}) && ($sch ~~ $self->{deny_schemes})) {
         return err(502, "Unsupported uri scheme (matches deny_schemes)");
     }
 
@@ -439,11 +425,11 @@ sub action_list {
     my $filter_path = sub {
         my $path = shift;
         if (defined($self->{allow_paths}) &&
-                !__match_list($path, $self->{allow_paths})) {
+                !__match_paths($path, $self->{allow_paths})) {
             return 0;
         }
         if (defined($self->{deny_paths}) &&
-                __match_list($path, $self->{deny_paths})) {
+                __match_paths($path, $self->{deny_paths})) {
             return 0;
         }
         1;
