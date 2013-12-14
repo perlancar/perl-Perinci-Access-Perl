@@ -73,6 +73,7 @@ sub new {
     #$self->{allow_schemes}
     #$self->{deny_schemes}
     #$self->{package_prefix}
+    $self->{debug}                 //= $ENV{PERINCI_ACCESS_SCHEMELESS_DEBUG} // 0;
 
     $self;
 }
@@ -347,7 +348,15 @@ sub request {
 
     my $meth = "action_$action";
     # check transaction
-    $self->$meth($req);
+
+    $res = $self->$meth($req);
+    if ($self->{debug}) {
+        $res->[3] //= {};
+        $res->[3]{debug} = {
+            req => $req,
+        };
+    }
+    $res;
 }
 
 sub parse_url {
