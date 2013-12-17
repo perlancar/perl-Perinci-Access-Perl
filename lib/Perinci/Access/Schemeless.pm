@@ -493,7 +493,7 @@ sub action_list {
         }
     }
 
-    [200, "OK", \@res];
+    [200, "OK (list action)", \@res];
 }
 
 sub actionmeta_meta { +{
