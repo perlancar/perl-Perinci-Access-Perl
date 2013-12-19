@@ -897,7 +897,7 @@ property in its metadata:
      ...
  }
 
-For these functions, periai will then pass a special argument C<-progress>
+For these functions, this class will pass a special argument C<-progress>
 containing L<Progress::Any> object. Functions can update progress using this
 object.
 
