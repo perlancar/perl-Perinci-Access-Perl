@@ -97,6 +97,68 @@ sub test_uws { [200] }
 
 package main;
 
+subtest __match_paths => sub {
+    ok(!Perinci::Access::Schemeless::__match_paths("/"   , "/a") , "/ vs /a");
+    ok(!Perinci::Access::Schemeless::__match_paths("/"   , "/a/"), "/ vs /a/");
+    ok( Perinci::Access::Schemeless::__match_paths("/a"  , "/a") , "/a vs /a");
+    ok( Perinci::Access::Schemeless::__match_paths("/a/" , "/a") , "/a/ vs /a");
+    ok( Perinci::Access::Schemeless::__match_paths("/a"  , "/a/"), "/a vs /a/");
+    ok( Perinci::Access::Schemeless::__match_paths("/a/" , "/a/"), "/a/ vs /a/");
+    ok(!Perinci::Access::Schemeless::__match_paths("/ab" , "/a") , "/ab vs /a");
+    ok(!Perinci::Access::Schemeless::__match_paths("/ab" , "/a/"), "/ab vs /a/");
+    ok( Perinci::Access::Schemeless::__match_paths("/a/b", "/a") , "/a/b vs /a");
+    ok( Perinci::Access::Schemeless::__match_paths("/a/b", "/a/"), "/a/b vs /a/");
+    ok( Perinci::Access::Schemeless::__match_paths("/a/b/c", "/a/b"), "/a/b/c vs /a/b");
+    ok(!Perinci::Access::Schemeless::__match_paths("/a/bc" , "/a/b"), "/a/bc vs /a/b");
+
+    ok(!Perinci::Access::Schemeless::__match_paths("/"    , "/a/b") , "/ vs /a/b/");
+    ok(!Perinci::Access::Schemeless::__match_paths("/"    , "/a/b/"), "/ vs /a/b/");
+    ok(!Perinci::Access::Schemeless::__match_paths("/a"   , "/a/b") , "/a vs /a/b");
+    ok(!Perinci::Access::Schemeless::__match_paths("/a"   , "/a/b/"), "/a vs /a/b/");
+    ok(!Perinci::Access::Schemeless::__match_paths("/a/"  , "/a/b") , "/a/ vs /a/b");
+    ok(!Perinci::Access::Schemeless::__match_paths("/a/"  , "/a/b/"), "/a/ vs /a/b/");
+    ok( Perinci::Access::Schemeless::__match_paths("/a/b" , "/a/b") , "/a/ vs /a/b");
+    ok( Perinci::Access::Schemeless::__match_paths("/a/b/", "/a/b") , "/a/b/ vs /a/b");
+    ok( Perinci::Access::Schemeless::__match_paths("/a/b" , "/a/b/"), "/a/b vs /a/b/");
+    ok( Perinci::Access::Schemeless::__match_paths("/a/b/", "/a/b/"), "/a/b/ vs /a/b/");
+
+    ok( Perinci::Access::Schemeless::__match_paths("/a"  , qr{\A/a(?:/|\z)}) , "/a vs qr{\\A/a(?:/|\\z)}");
+    ok( Perinci::Access::Schemeless::__match_paths("/a/" , qr{\A/a(?:/|\z)}) , "/a vs qr{\\A/a(?:/|\\z)}");
+    ok( Perinci::Access::Schemeless::__match_paths("/a/b", qr{\A/a(?:/|\z)}) , "/a/b vs qr{\\A/a(?:/|\\z)}");
+    ok(!Perinci::Access::Schemeless::__match_paths("/ab" , qr{\A/a(?:/|\z)}) , "/ab vs qr{\\A/a(?:/|\\z)}");
+};
+
+subtest __match_paths2 => sub {
+    ok( Perinci::Access::Schemeless::__match_paths2("/"   , "/a") , "/ vs /a");
+    ok( Perinci::Access::Schemeless::__match_paths2("/"   , "/a/"), "/ vs /a/");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a"  , "/a") , "/a vs /a");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a/" , "/a") , "/a/ vs /a");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a"  , "/a/"), "/a vs /a/");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a/" , "/a/"), "/a/ vs /a/");
+    ok(!Perinci::Access::Schemeless::__match_paths2("/ab" , "/a") , "/ab vs /a");
+    ok(!Perinci::Access::Schemeless::__match_paths2("/ab" , "/a/"), "/ab vs /a/");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a/b", "/a") , "/a/b vs /a");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a/b", "/a/"), "/a/b vs /a/");
+
+    ok( Perinci::Access::Schemeless::__match_paths2("/"    , "/a/b") , "/ vs /a/b/");
+    ok( Perinci::Access::Schemeless::__match_paths2("/"    , "/a/b/"), "/ vs /a/b/");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a"   , "/a/b") , "/a vs /a/b");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a"   , "/a/b/"), "/a vs /a/b/");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a/"  , "/a/b") , "/a/ vs /a/b");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a/"  , "/a/b/"), "/a/ vs /a/b/");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a/b" , "/a/b") , "/a/b vs /a/b");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a/b/", "/a/b") , "/a/b/ vs /a/b");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a/b" , "/a/b/"), "/a/b vs /a/b/");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a/b/", "/a/b/"), "/a/b/ vs /a/b/");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a/b/c", "/a/b"), "/a/b/c vs /a/b");
+    ok(!Perinci::Access::Schemeless::__match_paths2("/a/bc" , "/a/b"), "/a/bc vs /a/b");
+
+    ok( Perinci::Access::Schemeless::__match_paths2("/a"  , qr{\A/a(?:/|\z)})  , "/a vs qr{\\A/a(?:/|\\z)}");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a/" , qr{\A/a(?:/|\z)}) , "/a vs qr{\\A/a(?:/|\\z)}");
+    ok( Perinci::Access::Schemeless::__match_paths2("/a/b", qr{\A/a(?:/|\z)}) , "/a/b vs qr{\\A/a(?:/|\\z)}");
+    ok( Perinci::Access::Schemeless::__match_paths2("/ab" , qr{\A/a(?:/|\z)}) , "/ab vs qr{\\A/a(?:/|\\z)}");
+};
+
 # test after_load first, for first time loading of
 # Perinci::Examples
 
@@ -274,13 +336,43 @@ subtest "opt: {allow,deny}_paths" => sub {
         status => 403,
     );
     test_request(
-        name => 'allow_paths on list',
-        object_opts => {allow_paths=>qr!^/Perinci/Examples/([c]|$)!},
+        name => 'allow_paths on list /',
+        object_opts => {allow_paths=>'/Perinci/Examples'},
+        req => [list => "/"],
+        status => 200,
+        posttest => sub {
+            my ($res) = @_;
+            ok(@{$res->[2]} == 1, "number of results"); # Perinci/
+        },
+    );
+    test_request(
+        name => 'allow_paths on list /Perinci/',
+        object_opts => {allow_paths=>'/Perinci/Examples'},
+        req => [list => "/Perinci/"],
+        status => 200,
+        posttest => sub {
+            my ($res) = @_;
+            ok(@{$res->[2]} == 1, "number of results"); # Examples/
+        },
+    );
+    test_request(
+        name => 'allow_paths on list /Perinci/Examples/',
+        object_opts => {allow_paths=>'/Perinci/Examples'},
         req => [list => "/Perinci/Examples/"],
         status => 200,
         posttest => sub {
             my ($res) = @_;
-            ok(@{$res->[2]} <= 3, "number of results"); # call_gen_array, call_randlog
+            ok(@{$res->[2]} > 5, "number of results"); # lots of func
+        },
+    );
+    test_request(
+        name => 'allow_paths on list /Perinci/Examples/Completion/',
+        object_opts => {allow_paths=>'/Perinci/Examples'},
+        req => [list => "/Perinci/Examples/Completion/"],
+        status => 200,
+        posttest => sub {
+            my ($res) = @_;
+            ok(@{$res->[2]} == 1, "number of results"); # fruits
         },
     );
     test_request(
