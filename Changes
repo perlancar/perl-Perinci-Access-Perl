@@ -1,5 +1,13 @@
 Revision history for Perinci-Access-Perl
 
+0.57     2013-12-21 (SHARYANTO)
+
+         [BUG FIXES]
+
+         - On load=0, return error on request to package that does not exist (so
+           that things like list => /Existing/Sub_That_Doesnt_Exist/ can fail).
+
+
 0.56     2013-12-20 (SHARYANTO)
 
          - Allow list action on parent of allowed paths (e.g. allow_paths=/a/b
