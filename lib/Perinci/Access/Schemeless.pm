@@ -206,8 +206,15 @@ sub _load_module {
 
     my $pkg = $req->{-perl_package};
 
-    # there is no module to load, or we are instructed not to load any modules.
-    return if !$pkg || !$self->{load};
+    # skip there is no module to load
+    return if !$pkg;
+
+    # if we are instructed not to load any module, we just check via existence
+    # of packages
+    unless ($self->{load}) {
+        return if package_exists($pkg);
+        return err(500, "Package $pkg does not exist");
+    }
 
     my $module_p = $pkg;
     $module_p =~ s!::!/!g;
@@ -483,9 +490,6 @@ sub action_list {
         }
         1;
     };
-
-    # TODO: if load=0, then instead of using list_modules(), use list_packages()
-    # instead and skip the filesystem.
 
     my %mem;
 
