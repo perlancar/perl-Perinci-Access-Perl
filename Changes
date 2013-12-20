@@ -1,5 +1,12 @@
 Revision history for Perinci-Access-Perl
 
+0.56     2013-12-20 (SHARYANTO)
+
+         - Allow list action on parent of allowed paths (e.g. allow_paths=/a/b
+           then we allow list on / and /a but it will still show only the
+           allowed paths).
+
+
 0.55     2013-11-27 (SHARYANTO)
 
          - Allow scheme '/' in Perinci::Access::Perl (for App::riap's
