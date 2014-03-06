@@ -308,7 +308,6 @@ sub _get_code_and_meta {
             require Perinci::Sub::Wrapper;
             $wrapres = Perinci::Sub::Wrapper::wrap_sub(
                 sub_name=>$name, meta=>$meta,
-                forbid_tags => ['die'],
                 %{$self->{extra_wrapper_args}},
                 convert=>{
                     args_as=>'hash', result_naked=>0,
@@ -607,7 +606,11 @@ sub action_call {
         $tm->{_tx_id} = undef if $tm;
     } else {
         $args{-confirm} = 1 if $req->{confirm};
-        $res = $code->(%args);
+        eval { $res = $code->(%args) };
+        my $eval_err = $@;
+        if ($eval_err) {
+            $res = err(500, "Function died: $eval_err", $res);
+        }
     }
 
     $res;
