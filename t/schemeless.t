@@ -655,6 +655,9 @@ test_request(
         args_as=>'hash',
         entity_v=>1.2,
         features=>{},
+        "x.perinci.sub.wrapper.log" => [
+            {normalize_schema=>1, validate_args=>1, validate_result=>1},
+        ],
     },
 );
 
@@ -682,12 +685,18 @@ test_request(
                 args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
                 features=>{},
+                "x.perinci.sub.wrapper.log" => [
+                    {normalize_schema=>1, validate_args=>1, validate_result=>1},
+                ],
             },
         'f2' =>
             {
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
+                "x.perinci.sub.wrapper.log" => [
+                    {normalize_schema=>1, validate_args=>1, validate_result=>1},
+                ],
             },
         'req_confirm' =>
             {
@@ -695,6 +704,9 @@ test_request(
                 args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
                 features=>{},
+                "x.perinci.sub.wrapper.log" => [
+                    {normalize_schema=>1, validate_args=>1, validate_result=>1},
+                ],
             },
         'dry_run' =>
             {
@@ -702,6 +714,9 @@ test_request(
                 args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
                 features => {dry_run=>1},
+                "x.perinci.sub.wrapper.log" => [
+                    {normalize_schema=>1, validate_args=>1, validate_result=>1},
+                ],
             },
         'tx' =>
             {
@@ -709,19 +724,22 @@ test_request(
                 args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
                 features => {tx=>{v=>2}, idempotent=>1},
+                "x.perinci.sub.wrapper.log" => [
+                    {normalize_schema=>1, validate_args=>1, validate_result=>1},
+                ],
             },
     },
 );
 
 test_request(
     name => 'opt: extra_wrapper_args',
-    object_opts=>{extra_wrapper_args=>{remove_internal_properties=>0}},
+    object_opts=>{extra_wrapper_args=>{_remove_internal_properties=>0}},
     req => [meta => '/Test/Perinci/Access/Schemeless/f1'],
     status => 200,
     posttest => sub {
         my ($res) = @_;
         my $meta = $res->[2];
-        ok($meta->{_internal1}, "remove_internal_properties passed to wrapper")
+        ok($meta->{_internal1}, "_remove_internal_properties passed to wrapper")
             or diag explain $res;
     },
 );
