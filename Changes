@@ -1,5 +1,11 @@
 Revision history for Perinci-Access-Perl
 
+0.59     2014-03-07 (SHARYANTO)
+
+         - Skip wrapping function if already metadata tells that wrapped in
+           embed mode (see Dist::Zilla::Plugin::Rinci::Wrap).
+
+
 0.58     2014-03-06 (SHARYANTO)
 
          - No functional changes. Adjust to Perinci::Sub::Wrapper 0.51.
