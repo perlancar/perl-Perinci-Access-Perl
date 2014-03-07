@@ -300,7 +300,9 @@ sub _get_code_and_meta {
         my $wrapres;
       GET_CODE:
         {
-            if (!$self->{wrap}) {
+            if (!$self->{wrap} ||
+                    ($meta->{"x.perinci.sub.wrapper.log"} &&
+                         $meta->{"x.perinci.sub.wrapper.log"}[-1]{embed})) {
                 $code = \&{$name};
                 last GET_CODE;
             }
