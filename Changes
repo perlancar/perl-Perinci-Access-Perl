@@ -1,5 +1,14 @@
 Revision history for Perinci-Access-Perl
 
+0.60     2014-03-20 (SHARYANTO)
+
+         [INTERNAL]
+
+         - Avoid using _get_code_and_meta() accept in get_code() and get_meta(),
+           for better subclassing (I'm currently hacking on
+           Perinci::Access::Schemeless::DBI).
+
+
 0.59     2014-03-07 (SHARYANTO)
 
          - Skip wrapping function if already metadata tells that wrapped in
