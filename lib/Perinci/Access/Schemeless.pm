@@ -575,12 +575,14 @@ sub action_call {
         $tm->{_tx_id} = $req->{tx_id};
     }
 
-    $res = $self->_get_code_and_meta($req);
-    return $res unless $res->[0] == 200;
-    my ($code, $meta) = @{$res->[2]};
+    $res = $self->get_meta($req);
+    return $res if $res;
+    $res = $self->get_code($req);
+    return $res if $res;
+
     my %args = %{ $req->{args} // {} };
 
-    my $risub = risub($meta);
+    my $risub = risub($req->{-meta});
 
     if ($req->{dry_run}) {
         return err(412, "Function does not support dry run")
@@ -608,7 +610,7 @@ sub action_call {
         $tm->{_tx_id} = undef if $tm;
     } else {
         $args{-confirm} = 1 if $req->{confirm};
-        eval { $res = $code->(%args) };
+        eval { $res = $req->{-code}->(%args) };
         my $eval_err = $@;
         if ($eval_err) {
             $res = err(500, "Function died: $eval_err", $res);
@@ -631,11 +633,10 @@ sub action_complete_arg_val {
     my $word = $req->{word} // "";
     my $ci = $req->{ci};
 
-    my $res = $self->_get_code_and_meta($req);
-    return $res unless $res->[0] == 200;
-    my (undef, $meta) = @{$res->[2]};
+    my $res = $self->get_meta($req);
+    return $res if $res;
     [200, "OK (complete_arg_val action)",
-     Perinci::Sub::Complete::complete_arg_val(meta=>$meta, word=>$word,
+     Perinci::Sub::Complete::complete_arg_val(meta=>$req->{-meta}, word=>$word,
                                               arg=>$arg, ci=>$ci) // []];
 }
 
