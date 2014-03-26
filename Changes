@@ -1,5 +1,12 @@
 Revision history for Perinci-Access-Perl
 
+0.61     2014-03-26 (SHARYANTO)
+
+         [BUG FIXES]
+
+         - Die message from function got hidden.
+
+
 0.60     2014-03-20 (SHARYANTO)
 
          [INTERNAL]
