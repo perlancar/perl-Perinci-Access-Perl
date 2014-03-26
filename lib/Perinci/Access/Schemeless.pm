@@ -613,7 +613,7 @@ sub action_call {
         eval { $res = $req->{-code}->(%args) };
         my $eval_err = $@;
         if ($eval_err) {
-            $res = err(500, "Function died: $eval_err", $res);
+            $res = err(500, "Function died: $eval_err");
         }
     }
 
