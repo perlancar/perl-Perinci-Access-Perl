@@ -301,8 +301,13 @@ sub _get_code_and_meta {
       GET_CODE:
         {
             if (!$self->{wrap} ||
+                    # .log is old name, we'll support it for some time
                     ($meta->{"x.perinci.sub.wrapper.log"} &&
-                         $meta->{"x.perinci.sub.wrapper.log"}[-1]{embed})) {
+                         $meta->{"x.perinci.sub.wrapper.log"}[-1]{embed})
+                        ||
+                    ($meta->{"x.perinci.sub.wrapper.logs"} &&
+                         $meta->{"x.perinci.sub.wrapper.logs"}[-1]{embed})
+                ) {
                 $code = \&{$name};
                 last GET_CODE;
             }
