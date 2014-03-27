@@ -1,5 +1,12 @@
 Revision history for Perinci-Access-Perl
 
+0.62     2014-03-27 (SHARYANTO)
+
+         - No functional changes.
+
+         - Adjust to Perinci::Sub::Wrapper 0.56.
+
+
 0.61     2014-03-26 (SHARYANTO)
 
          [BUG FIXES]

@@ -655,7 +655,7 @@ test_request(
         args_as=>'hash',
         entity_v=>1.2,
         features=>{},
-        "x.perinci.sub.wrapper.log" => [
+        "x.perinci.sub.wrapper.logs" => [
             {normalize_schema=>1, validate_args=>1, validate_result=>1},
         ],
     },
@@ -685,7 +685,7 @@ test_request(
                 args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
                 features=>{},
-                "x.perinci.sub.wrapper.log" => [
+                "x.perinci.sub.wrapper.logs" => [
                     {normalize_schema=>1, validate_args=>1, validate_result=>1},
                 ],
             },
@@ -694,7 +694,7 @@ test_request(
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
-                "x.perinci.sub.wrapper.log" => [
+                "x.perinci.sub.wrapper.logs" => [
                     {normalize_schema=>1, validate_args=>1, validate_result=>1},
                 ],
             },
@@ -704,7 +704,7 @@ test_request(
                 args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
                 features=>{},
-                "x.perinci.sub.wrapper.log" => [
+                "x.perinci.sub.wrapper.logs" => [
                     {normalize_schema=>1, validate_args=>1, validate_result=>1},
                 ],
             },
@@ -714,7 +714,7 @@ test_request(
                 args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
                 features => {dry_run=>1},
-                "x.perinci.sub.wrapper.log" => [
+                "x.perinci.sub.wrapper.logs" => [
                     {normalize_schema=>1, validate_args=>1, validate_result=>1},
                 ],
             },
@@ -724,7 +724,7 @@ test_request(
                 args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
                 features => {tx=>{v=>2}, idempotent=>1},
-                "x.perinci.sub.wrapper.log" => [
+                "x.perinci.sub.wrapper.logs" => [
                     {normalize_schema=>1, validate_args=>1, validate_result=>1},
                 ],
             },
