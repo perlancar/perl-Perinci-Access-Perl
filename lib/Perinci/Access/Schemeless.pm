@@ -21,9 +21,6 @@ use URI::Split qw(uri_split uri_join);
 our $re_perl_package =
     qr/\A[A-Za-z_][A-Za-z_0-9]*(::[A-Za-z_][A-Za-z_0-9]*)*\z/;
 
-# note: no method should die() because we are called by
-# Perinci::Access::HTTP::Server without extra eval().
-
 sub new {
     require Class::Inspector;
 
