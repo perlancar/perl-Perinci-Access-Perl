@@ -34,9 +34,6 @@ sub new {
         variable => [],
     ); # key = type, val = [[ACTION, META], ...]
 
-    # cache, so we can save a method call for every request()
-    $self->{_actionmetas} = {}; # key = act
-
     my @comacts;
     for my $meth (@{Class::Inspector->methods(ref $self)}) {
         next unless $meth =~ /^actionmeta_(.+)/;
@@ -384,15 +381,18 @@ sub request {
     my $res = $self->check_request($req);
     return $res if $res;
 
-    my $am = $self->{_actionmetas}{$action};
-    return err(502, "Action '$action' not implemented") unless $am;
+    return err(502, "Action '$action' not implemented")
+        unless $self->can("actionmeta_$action");
+
+    my $am = $self->${\("actionmeta_$action")};
 
     $res = $self->_parse_uri($req);
     return $res if $res;
 
     return err(502, "Action '$action' not implemented for ".
                    "'$req->{-type}' entity")
-        unless $self->{_typeacts}{ $req->{-type} }{ $action };
+        unless $am->{applies_to}[0] eq '*' ||
+            $req->{-type} ~~ @{ $am->{applies_to} };
 
     my $meth = "action_$action";
     # check transaction
