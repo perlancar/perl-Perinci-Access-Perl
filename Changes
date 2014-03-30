@@ -1,5 +1,15 @@
 Revision history for Perinci-Access-Perl
 
+0.63     2014-03-30 (SHARYANTO)
+
+         [INTERNAL]
+
+         - Remove $self->{_actionmetas} and $self->{_typeaccts} cache. They are
+           per-object (instead of global) so a bit wasteful, they make patching
+           of adding new actions not work after the object is created, and they
+           are microoptimization anyway.
+
+
 0.62     2014-03-27 (SHARYANTO)
 
          - No functional changes.
