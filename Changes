@@ -1,5 +1,13 @@
 Revision history for Perinci-Access-Perl
 
+0.64     2014-04-15 (SHARYANTO)
+
+         - call action: accept 'argv' Riap request key. This is actually not
+           defined yet in specification, but useful in cases where an argument
+           has a cmdline_alias with coderef, where it will fail to be parsed at
+           the client-side because JSON doesn't transport the coderef.
+
+
 0.63     2014-03-30 (SHARYANTO)
 
          [INTERNAL]
