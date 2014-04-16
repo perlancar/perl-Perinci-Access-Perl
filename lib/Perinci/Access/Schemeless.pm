@@ -17,6 +17,7 @@ use Tie::Cache;
 use URI::Split qw(uri_split uri_join);
 
 # VERSION
+# DATE
 
 our $re_perl_package =
     qr/\A[A-Za-z_][A-Za-z_0-9]*(::[A-Za-z_][A-Za-z_0-9]*)*\z/;
@@ -334,6 +335,12 @@ sub _get_code_and_meta {
         my $ver = ${ $req->{-perl_package} . "::VERSION" };
         if (defined $ver) {
             $meta->{entity_v} = $ver;
+        }
+    }
+    unless (defined $meta->{entity_date}) {
+        my $date = ${ $req->{-perl_package} . "::DATE" };
+        if (defined $date) {
+            $meta->{entity_date} = $date;
         }
     }
     [200, "OK", [$code, $meta, $extra]];

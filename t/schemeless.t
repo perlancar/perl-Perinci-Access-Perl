@@ -20,6 +20,7 @@ package Foo;
 
 package Bar;
 our $VERSION = 0.123;
+our $DATE = '1999-01-01';
 
 our %SPEC;
 $SPEC{f1} = {v=>1.1, args=>{}};
@@ -444,14 +445,14 @@ subtest "action: meta" => sub {
         name => 'meta on package (default meta, entity_v from VERSION)',
         req => [meta => "/Bar/"],
         status => 200,
-        result => { v => 1.1, entity_v => 0.123 },
+        result => { v => 1.1, entity_v => 0.123, entity_date=>'1999-01-01' },
     );
     test_request(
         name => 'meta on function (entity_v from VERSION)',
         object_opts=>{wrap=>0},
         req => [meta => "/Bar/f1"],
         status => 200,
-        result => {v=>1.1, args=>{}, entity_v => 0.123},
+        result => {v=>1.1, args=>{}, entity_v => 0.123, entity_date=>'1999-01-01'},
     );
     test_request(
         name => 'meta on package (entity_v not overridden)',
