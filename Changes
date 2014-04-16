@@ -1,5 +1,10 @@
 Revision history for Perinci-Access-Perl
 
+0.65     2014-04-16 (SHARYANTO)
+
+         - Set 'entity_date' property from $DATE package variable.
+
+
 0.64     2014-04-15 (SHARYANTO)
 
          - call action: accept 'argv' Riap request key. This is actually not
