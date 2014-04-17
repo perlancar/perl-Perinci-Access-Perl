@@ -11,7 +11,7 @@ use parent qw(Perinci::Access::Base);
 use Perinci::Object;
 use Perinci::Sub::Util qw(err);
 use Scalar::Util qw(blessed reftype);
-use SHARYANTO::ModuleOrPrefix::Path qw(module_or_prefix_path);
+use ModuleOrPrefix::Path qw(module_or_prefix_path);
 use SHARYANTO::Package::Util qw(package_exists);
 use Tie::Cache;
 use URI::Split qw(uri_split uri_join);
