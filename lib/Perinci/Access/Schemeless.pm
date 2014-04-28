@@ -9,6 +9,7 @@ use Log::Any '$log';
 use parent qw(Perinci::Access::Base);
 
 use Perinci::Object;
+use Perinci::Sub::Normalize qw(normalize_function_metadata);
 use Perinci::Sub::Util qw(err);
 use Scalar::Util qw(blessed reftype);
 use ModuleOrPrefix::Path qw(module_or_prefix_path);
@@ -55,21 +56,30 @@ sub new {
     }
     $self->{_typeacts} = \%typeacts;
 
-    $self->{cache_size}            //= 100; # for caching wrap result in memory
-    $self->{use_tx}                //= 0;
-    $self->{wrap}                  //= 1;
-    $self->{custom_tx_manager}     //= undef;
-    $self->{load}                  //= 1;
-    $self->{extra_wrapper_args}    //= {};
-    $self->{extra_wrapper_convert} //= {};
+    $self->{cache_size}              //= 100; # for caching metadata & coded
+    #$self->{use_tx}                  //= 0;
+    $self->{wrap}                    //= 1;
+    #$self->{custom_tx_manager}       //= undef;
+    $self->{load}                    //= 1;
+    $self->{set_function_properties} //= {};
+    $self->{normalize_metadata}      //= 1;
     #$self->{after_load}
     #$self->{allow_paths}
     #$self->{deny_paths}
     #$self->{allow_schemes}
     #$self->{deny_schemes}
     #$self->{package_prefix}
-    $self->{debug}                 //= $ENV{PERINCI_ACCESS_SCHEMELESS_DEBUG} // 0;
-    $self->{accept_argv}           //= 1;
+    $self->{debug}                   //= $ENV{PERINCI_ACCESS_SCHEMELESS_DEBUG} // 0;
+    $self->{accept_argv}             //= 1;
+
+    if ($self->{cache_size} > 0) {
+        my %metacache;
+        tie %metacache, 'Tie::Cache', $self->{cache_size};
+        $self->{_meta_cache} = \%metacache;
+        my %codecache;
+        tie %codecache, 'Tie::Cache', $self->{cache_size};
+        $self->{_code_cache} = \%codecache;
+    }
 
     $self;
 }
@@ -263,118 +273,135 @@ sub _load_module {
     return $res;
 }
 
-sub _get_code_and_meta {
-    no strict 'refs';
-    my ($self, $req) = @_;
-    my $name = $req->{-perl_package} . "::" . $req->{-uri_leaf};
-    my $type = $req->{-type};
-    return [200, "OK (cached)", $self->{_cache}{$name}]
-        if $self->{_cache}{$name};
-
-    my $res = $self->_load_module($req);
-    # missing module (but existing prefix) is okay for package, we construct an
-    # empty package metadata for it
-    return $res if $res && !($type eq 'package' && $res->[0] == 405);
-
-    no strict 'refs';
-    my $metas = \%{"$req->{-perl_package}::SPEC"};
-    my $meta = $metas->{ $req->{-uri_leaf} || ":package" };
-
-    if (!$meta && $type eq 'package') {
-        $meta = {v=>1.1};
-    }
-
-    return err(404, "No metadata for $name") unless $meta;
-
-    my $code;
-    my $extra = {};
-    if ($req->{-type} eq 'function') {
-        return err(404, "Can't find function $req->{-uri_leaf} in ".
-                       "module $req->{-perl_package}")
-            unless defined &{$name};
-
-        my $wrapres;
-      GET_CODE:
-        {
-            if (!$self->{wrap} ||
-                    # .log is old name, we'll support it for some time
-                    ($meta->{"x.perinci.sub.wrapper.log"} &&
-                         $meta->{"x.perinci.sub.wrapper.log"}[-1]{embed})
-                        ||
-                    ($meta->{"x.perinci.sub.wrapper.logs"} &&
-                         $meta->{"x.perinci.sub.wrapper.logs"}[-1]{embed})
-                ) {
-                $code = \&{$name};
-                last GET_CODE;
-            }
-
-            require Perinci::Sub::Wrapper;
-            $wrapres = Perinci::Sub::Wrapper::wrap_sub(
-                sub_name=>$name, meta=>$meta,
-                %{$self->{extra_wrapper_args}},
-                convert=>{
-                    args_as=>'hash', result_naked=>0,
-                    %{$self->{extra_wrapper_convert}},
-                });
-            return err(500, "Can't wrap function", $wrapres)
-                unless $wrapres->[0] == 200;
-            $code = $wrapres->[2]{sub};
-            $extra->{orig_meta} = {
-                # store some info about the old meta, no need to store all for
-                # efficiency
-                result_naked=>$meta->{result_naked},
-                args_as=>$meta->{args_as},
-            };
-            $meta = $wrapres->[2]{meta};
-        }
-
-        $self->{_cache}{$name} = [$code, $meta, $extra]
-            if $self->{cache_size};
-    }
-    unless (defined $meta->{entity_v}) {
-        my $ver = ${ $req->{-perl_package} . "::VERSION" };
-        if (defined $ver) {
-            $meta->{entity_v} = $ver;
-        }
-    }
-    unless (defined $meta->{entity_date}) {
-        my $date = ${ $req->{-perl_package} . "::DATE" };
-        if (defined $date) {
-            $meta->{entity_date} = $date;
-        }
-    }
-    [200, "OK", [$code, $meta, $extra]];
-}
-
 sub get_meta {
-    my $self = shift;
-
-    my ($req) = @_;
+    my ($self, $req) = @_;
 
     if (!$req->{-perl_package}) {
         $req->{-meta} = {v=>1.1}; # empty metadata for /
         return;
     }
 
-    my $res = $self->_get_code_and_meta($req);
+    my $type = $req->{-type};
+    my $name = $req->{-perl_package} . "::" . $req->{-uri_leaf};
+    if ($self->{_meta_cache}{$name}) {
+        $req->{-meta} = $self->{_meta_cache}{$name};
+        return;
+    }
+
+    my $res = $self->_load_module($req);
+    # missing module (but existing prefix) is okay for package, we construct an
+    # empty package metadata for it
+    return $res if $res && !($type eq 'package' && $res->[0] == 405);
+
+    my $meta;
+    {
+        no strict 'refs';
+        my $metas = \%{"$req->{-perl_package}::SPEC"};
+        $meta = $metas->{ $req->{-uri_leaf} || ":package" };
+    }
+
+    if (!$meta && $type eq 'package') {
+        $req->{-meta} = {v=>1.1};
+        return;
+    }
+
+    return err(404, "No metadata for $name") unless $meta;
+
     if ($res->[0] == 405) {
         $req->{-meta} = {v=>1.1}; # empty package metadata for dir
         return;
     } elsif ($res->[0] != 200) {
         return $res;
     }
-    $req->{-meta} = $res->[2][1];
-    $req->{-orig_meta} = $res->[2][2]{orig_meta};
+
+    # normalize has only been implemented for function
+    if ($type eq 'function') {
+        my $nmeta;
+        eval { $nmeta = normalize_function_metadata($meta) };
+        if ($@) {
+            return [500, "Can't normalize function metadata: $@"];
+        }
+
+        $nmeta->{args_as} = 'hash';
+        $nmeta->{result_naked} = 0;
+        my $sfp = $self->{set_function_properties};
+        $nmeta->{$_} = $sfp->{$_} for keys %$sfp;
+
+        if ($self->{cache_size} > 0) {
+            $self->{_meta_cache} = $nmeta;
+        }
+
+        $req->{-meta} = $nmeta;
+        return;
+    }
+
+    $req->{-meta} = $meta;
     return;
 }
 
 sub get_code {
-    my $self = shift;
+    my ($self, $req) = @_;
 
-    my ($req) = @_;
-    my $res = $self->_get_code_and_meta($req);
-    return $res unless $res->[0] == 200;
-    $req->{-code} = $res->[2][0];
+    # because we're lazy, we assume here that type is already function. it
+    # should be okay since get_code() is only called by action_call().
+
+    my $name = $req->{-perl_package} . "::" . $req->{-uri_leaf};
+    if ($self->{_code_cache}{$name}) {
+        $req->{-code} = $self->{_code_cache}{$name};
+        return;
+    }
+
+    my $res = $self->_load_module($req);
+    return $res if $res;
+
+    return err(404, "Can't find function $req->{-uri_leaf} in ".
+                   "module $req->{-perl_package}")
+        unless defined &{$name};
+
+    # we get our own meta and not use get_meta() because we want to get the
+    # original metadata
+    my $meta;
+    {
+        no strict 'refs';
+        my $metas = \%{"$req->{-perl_package}::SPEC"};
+        $meta = $metas->{ $req->{-uri_leaf} || ":package" };
+    }
+
+    return err(404, "Can't find function metadata $req->{-uri_leaf} in ".
+                   "module $req->{-perl_package}")
+        unless $meta;
+
+    my $code;
+  GET_CODE:
+    {
+        # we don't need to wrap
+        if (!$self->{wrap} ||
+                # .log is old name, we'll support it for some time
+                ($meta->{"x.perinci.sub.wrapper.log"} &&
+                     $meta->{"x.perinci.sub.wrapper.log"}[-1]{embed})
+                    ||
+                        ($meta->{"x.perinci.sub.wrapper.logs"} &&
+                             $meta->{"x.perinci.sub.wrapper.logs"}[-1]{embed})
+                    ) {
+            $code = \&{$name};
+            last GET_CODE;
+        }
+
+        require Perinci::Sub::Wrapper;
+        my $wrapres = Perinci::Sub::Wrapper::wrap_sub(
+            sub_name=>$name, meta=>$meta,
+            convert=>{args_as=>'hash', result_naked=>0,
+                      %{$self->{set_function_properties}},
+                  });
+        return err(500, "Can't wrap function", $wrapres)
+            unless $wrapres->[0] == 200;
+        my $code = $wrapres->[2]{sub};
+
+        $self->{_code_cache}{$name} = $code
+            if $self->{cache_size} > 0;
+    }
+
+    $req->{-code} = $code;
     return;
 }
 
@@ -562,7 +589,7 @@ sub action_meta {
     my $res = $self->get_meta($req);
     return $res if $res;
 
-    [200, "OK (meta action)", $req->{-meta}, {orig_meta=>$req->{-orig_meta}}];
+    [200, "OK (meta action)", $req->{-meta}];
 }
 
 sub actionmeta_call { +{
@@ -685,9 +712,8 @@ sub action_child_metas {
         # ignore failed request
         next unless $res->[0] == 200;
         $res{$ent} = $res->[2];
-        $om{$ent}  = $res->[3]{orig_meta};
     }
-    [200, "OK (child_metas action)", \%res, {orig_metas=>\%om}];
+    [200, "OK (child_metas action)", \%res];
 }
 
 sub actionmeta_get { +{
@@ -1032,21 +1058,13 @@ If set, code will be executed the first time Perl module is successfully loaded.
 If set to false, then wil use original subroutine and metadata instead of
 wrapped ones, for example if you are very concerned about performance (do not
 want to add another eval {} and subroutine call introduced by wrapping) or do
-not need the functionality provided by the wrapper (e.g. your function does not
-die and already validates its arguments, you do not want Sah schemas in the
-metadata to be normalized, etc).
+not need the functionality provided by the wrapper (e.g. your function already
+validates its arguments, accepts arguments as hash, and returns enveloped
+result).
 
-Wrapping is implemented inside C<get_meta()> and C<get_code()>.
+Wrapping is implemented inside C<get_code()>.
 
-=item * extra_wrapper_args => HASH
-
-If set, will be passed to L<Perinci::Sub::Wrapper>'s wrap_sub() when wrapping
-subroutines. Some applications of this include: adding C<timeout> or
-C<result_postfilter> properties to functions.
-
-This is only relevant if you enable C<wrap>.
-
-=item * extra_wrapper_convert => HASH
+=item * set_function_properties => HASH
 
 If set, will be passed to L<Perinci::Sub::Wrapper> wrap_sub()'s C<convert>
 argument when wrapping subroutines. Some applications of this include: changing
@@ -1056,9 +1074,8 @@ This is only relevant if you enable C<wrap>.
 
 =item * cache_size => INT (default: 100)
 
-Specify cache size (in number of items). Cache saves the result of function
-wrapping in memory using L<Tie::Cache> so future requests to the same function
-need not involve wrapping again. Setting this to 0 disables caching.
+Specify cache size (in number of items), for caching metadata and wrapping
+result. Setting this to 0 disables caching.
 
 Caching is implemented inside C<get_meta()> and C<get_code()> so you might want
 to implement your own caching if you override those.
