@@ -307,11 +307,13 @@ sub get_meta {
 
     return err(404, "No metadata for $name") unless $meta;
 
-    if ($res->[0] == 405) {
-        $req->{-meta} = {v=>1.1}; # empty package metadata for dir
-        return;
-    } elsif ($res->[0] != 200) {
-        return $res;
+    if ($res) {
+        if ($res->[0] == 405) {
+            $req->{-meta} = {v=>1.1}; # empty package metadata for dir
+            return;
+        } elsif ($res->[0] != 200) {
+            return $res;
+        }
     }
 
     # normalize has only been implemented for function
@@ -328,7 +330,7 @@ sub get_meta {
         $nmeta->{$_} = $sfp->{$_} for keys %$sfp;
 
         if ($self->{cache_size} > 0) {
-            $self->{_meta_cache} = $nmeta;
+            $self->{_meta_cache}{$name} = $nmeta;
         }
 
         $req->{-meta} = $nmeta;
@@ -395,7 +397,7 @@ sub get_code {
                   });
         return err(500, "Can't wrap function", $wrapres)
             unless $wrapres->[0] == 200;
-        my $code = $wrapres->[2]{sub};
+        $code = $wrapres->[2]{sub};
 
         $self->{_code_cache}{$name} = $code
             if $self->{cache_size} > 0;
