@@ -274,6 +274,8 @@ sub _load_module {
 }
 
 sub get_meta {
+    no strict 'refs';
+
     my ($self, $req) = @_;
 
     if (!$req->{-perl_package}) {
@@ -282,7 +284,9 @@ sub get_meta {
     }
 
     my $type = $req->{-type};
-    my $name = $req->{-perl_package} . "::" . $req->{-uri_leaf};
+    my $pkg  = $req->{-perl_package};
+
+    my $name = "$pkg\::$req->{-uri_leaf}";
     if ($self->{_meta_cache}{$name}) {
         $req->{-meta} = $self->{_meta_cache}{$name};
         return;
@@ -294,23 +298,18 @@ sub get_meta {
     return $res if $res && !($type eq 'package' && $res->[0] == 405);
 
     my $meta;
-    {
-        no strict 'refs';
-        my $metas = \%{"$req->{-perl_package}::SPEC"};
-        $meta = $metas->{ $req->{-uri_leaf} || ":package" };
-    }
+    my $metas = \%{"$pkg\::SPEC"};
+    $meta = $metas->{ $req->{-uri_leaf} || ":package" };
 
     if (!$meta && $type eq 'package') {
-        $req->{-meta} = {v=>1.1};
-        return;
+        $meta = {v=>1.1};
     }
 
     return err(404, "No metadata for $name") unless $meta;
 
     if ($res) {
         if ($res->[0] == 405) {
-            $req->{-meta} = {v=>1.1}; # empty package metadata for dir
-            return;
+            $meta = {v=>1.1}; # empty package metadata for dir
         } elsif ($res->[0] != 200) {
             return $res;
         }
@@ -318,23 +317,33 @@ sub get_meta {
 
     # normalize has only been implemented for function
     if ($type eq 'function') {
-        my $nmeta;
-        eval { $nmeta = normalize_function_metadata($meta) };
+        eval { $meta = normalize_function_metadata($meta) };
         if ($@) {
             return [500, "Can't normalize function metadata: $@"];
         }
 
-        $nmeta->{args_as} = 'hash';
-        $nmeta->{result_naked} = 0;
+        $meta->{args} //= {};
+        $meta->{args_as} = 'hash';
+        $meta->{result_naked} = 0;
         my $sfp = $self->{set_function_properties};
-        $nmeta->{$_} = $sfp->{$_} for keys %$sfp;
+        $meta->{$_} = $sfp->{$_} for keys %$sfp;
+    }
 
-        if ($self->{cache_size} > 0) {
-            $self->{_meta_cache}{$name} = $nmeta;
+    unless (defined $meta->{entity_v}) {
+        my $ver = ${"$pkg\::VERSION"};
+        if (defined $ver) {
+            $meta->{entity_v} = $ver;
         }
+    }
+    unless (defined $meta->{entity_date}) {
+        my $date = ${"$pkg\::DATE"};
+        if (defined $date) {
+            $meta->{entity_date} = $date;
+        }
+    }
 
-        $req->{-meta} = $nmeta;
-        return;
+    if ($self->{cache_size} > 0) {
+        $self->{_meta_cache}{$name} = $meta;
     }
 
     $req->{-meta} = $meta;

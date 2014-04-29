@@ -452,7 +452,7 @@ subtest "action: meta" => sub {
         object_opts=>{wrap=>0},
         req => [meta => "/Bar/f1"],
         status => 200,
-        result => {v=>1.1, args=>{}, entity_v => 0.123, entity_date=>'1999-01-01'},
+        result => {v=>1.1, args=>{}, result_naked=>0, args_as=>'hash', entity_v => 0.123, entity_date=>'1999-01-01'},
     );
     test_request(
         name => 'meta on package (entity_v not overridden)',
@@ -466,7 +466,7 @@ subtest "action: meta" => sub {
         object_opts=>{wrap=>0},
         req => [meta => "/Baz/f1"],
         status => 200,
-        result => {v=>1.1, entity_v=>10},
+        result => {v=>1.1, entity_v=>10, args=>{}, result_naked=>0, args_as=>'hash'},
     );
     test_request(
         name => 'ending slash matters',
