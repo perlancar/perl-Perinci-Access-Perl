@@ -336,7 +336,7 @@ sub get_meta {
     }
 
     # normalize has only been implemented for function
-    if ($type eq 'function') {
+    if ($type eq 'function' && $self->{normalize_metadata}) {
         eval { $meta = normalize_function_metadata($meta) };
         if ($@) {
             return [500, "Can't normalize function metadata: $@"];

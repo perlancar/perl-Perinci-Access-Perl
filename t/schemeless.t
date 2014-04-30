@@ -809,6 +809,18 @@ subtest 'opt: set_function_properties' => sub {
     );
 };
 
+test_request(
+    name => 'opt: normalize_metadata=0',
+    object_opts=>{normalize_metadata=>0},
+    req => [meta => '/Test/Perinci/Access/Schemeless/f1'],
+    status => 200,
+    posttest => sub {
+        my ($res) = @_;
+        my $meta = $res->[2];
+        is($meta->{args}{a1}{schema}, "int") or diag explain $meta;
+    },
+);
+
 subtest "parse_url" => sub {
     my $pa = Perinci::Access::Schemeless->new;
     is_deeply($pa->parse_url("/Perinci/Examples/"),
