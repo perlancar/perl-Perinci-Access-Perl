@@ -273,6 +273,26 @@ sub _load_module {
     return $res;
 }
 
+sub __inject_entity_v_date {
+    no strict 'refs';
+
+    my ($req, $meta) = @_;
+
+    my $pkg = $req->{-perl_package};
+    unless (defined $meta->{entity_v}) {
+        my $ver = ${"$pkg\::VERSION"};
+        if (defined $ver) {
+            $meta->{entity_v} = $ver;
+        }
+    }
+    unless (defined $meta->{entity_date}) {
+        my $date = ${"$pkg\::DATE"};
+        if (defined $date) {
+            $meta->{entity_date} = $date;
+        }
+    }
+}
+
 sub get_meta {
     no strict 'refs';
 
@@ -329,18 +349,7 @@ sub get_meta {
         $meta->{$_} = $sfp->{$_} for keys %$sfp;
     }
 
-    unless (defined $meta->{entity_v}) {
-        my $ver = ${"$pkg\::VERSION"};
-        if (defined $ver) {
-            $meta->{entity_v} = $ver;
-        }
-    }
-    unless (defined $meta->{entity_date}) {
-        my $date = ${"$pkg\::DATE"};
-        if (defined $date) {
-            $meta->{entity_date} = $date;
-        }
-    }
+    __inject_entity_v_date($req, $meta);
 
     if ($self->{cache_size} > 0) {
         $self->{_meta_cache}{$name} = $meta;
@@ -408,8 +417,16 @@ sub get_code {
             unless $wrapres->[0] == 200;
         $code = $wrapres->[2]{sub};
 
-        $self->{_code_cache}{$name} = $code
-            if $self->{cache_size} > 0;
+        if ($self->{cache_size} > 0) {
+            $self->{_code_cache}{$name} = $code;
+            # also put wrapper-generated meta in the cache, so further meta
+            # request can use this. the metadata from wrapper contains wrapper
+            # logs (x.perinci.sub.wrapper.logs) which can be helpful hint for
+            # some uses.
+            my $meta   = $wrapres->[2]{meta};
+            __inject_entity_v_date($req, $meta);
+            $self->{_meta_cache}{$name} = $meta;
+        }
     }
 
     $req->{-code} = $code;

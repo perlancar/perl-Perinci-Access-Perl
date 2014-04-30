@@ -400,6 +400,57 @@ subtest "opt: {allow,deny}_paths" => sub {
     );
 };
 
+subtest 'schema in metadata is normalized' => sub {
+    test_request(
+        name => 'first request (meta)',
+        req => [meta => '/Test/Perinci/Access/Schemeless/f1'],
+        status => 200,
+        result => {
+            v => 1.1,
+            summary => "An example function",
+            args => {
+                a1 => {schema=>["int"=>{}, {}]},
+            },
+            result => {
+                schema => ['int'=>{req=>1}, {}],
+            },
+            result_naked=>0,
+            args_as=>'hash',
+            entity_v=>1.2,
+            _internal1=>1,
+        },
+    );
+
+    test_request(
+        name   => 'second request (call) to trigger wrapper',
+        req    => [call => '/Test/Perinci/Access/Schemeless/f1'],
+        status => 200,
+    );
+
+    test_request(
+        name => 'third request (second meta) already uses meta from wrapper',
+        req => [meta => '/Test/Perinci/Access/Schemeless/f1'],
+        status => 200,
+        result => {
+            v => 1.1,
+            summary => "An example function",
+            args => {
+                a1 => {schema=>["int"=>{}, {}]},
+            },
+            result => {
+                schema => ['int'=>{req=>1}, {}],
+            },
+            result_naked=>0,
+            args_as=>'hash',
+            entity_v=>1.2,
+            _internal1=>1,
+            "x.perinci.sub.wrapper.logs" => [
+                {normalize_schema=>1, validate_args=>1, validate_result=>1},
+            ],
+        },
+    );
+};
+
 subtest "action: info" => sub {
     test_request(
         name => "info on / works",
@@ -651,35 +702,6 @@ subtest "action: complete_arg_val" => sub {
 };
 
 test_request(
-    name => 'opt: load=1 (will still try accessing the package anyway)',
-    req => [call => '/Test/Perinci/Access/Schemeless/f1'],
-    status => 200,
-);
-
-test_request(
-    name => 'schema in metadata is normalized',
-    req => [meta => '/Test/Perinci/Access/Schemeless/f1'],
-    status => 200,
-    result => {
-        v => 1.1,
-        summary => "An example function",
-        args => {
-            a1 => {schema=>["int"=>{}, {}]},
-        },
-        result => {
-            schema => ['int'=>{req=>1}, {}],
-        },
-        result_naked=>0,
-        args_as=>'hash',
-        entity_v=>1.2,
-        features=>{},
-        "x.perinci.sub.wrapper.logs" => [
-            {normalize_schema=>1, validate_args=>1, validate_result=>1},
-        ],
-    },
-);
-
-test_request(
     name => 'action: child_metas',
     req => [child_metas => '/Test/Perinci/Access/Schemeless/'],
     status => 200,
@@ -702,19 +724,16 @@ test_request(
                 },
                 args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
-                features=>{},
                 "x.perinci.sub.wrapper.logs" => [
                     {normalize_schema=>1, validate_args=>1, validate_result=>1},
                 ],
+                _internal1=>1,
             },
         'f2' =>
             {
                 v=>1.1,
-                args_as => 'hash', result_naked => 0,
+                args => {}, args_as => 'hash', result_naked => 0,
                 entity_v=>1.2,
-                "x.perinci.sub.wrapper.logs" => [
-                    {normalize_schema=>1, validate_args=>1, validate_result=>1},
-                ],
             },
         'req_confirm' =>
             {
@@ -750,35 +769,6 @@ test_request(
 );
 
 test_request(
-    name => 'opt: extra_wrapper_args',
-    object_opts=>{extra_wrapper_args=>{_remove_internal_properties=>0}},
-    req => [meta => '/Test/Perinci/Access/Schemeless/f1'],
-    status => 200,
-    posttest => sub {
-        my ($res) = @_;
-        my $meta = $res->[2];
-        ok($meta->{_internal1}, "_remove_internal_properties passed to wrapper")
-            or diag explain $res;
-    },
-);
-test_request(
-    name => 'opt: extra_wrapper_convert',
-    object_opts=>{extra_wrapper_convert=>{default_lang=>"id_ID"}},
-    req => [meta => '/Test/Perinci/Access/Schemeless/f1'],
-    status => 200,
-    posttest => sub {
-        my ($res) = @_;
-        my $meta = $res->[2];
-        ok($meta->{"summary.alt.lang.en_US"},
-           "default_lang convert passed to wrapper (1)")
-            or diag explain $res;
-        ok(!$meta->{summary},
-           "default_lang convert passed to wrapper (2)")
-            or diag explain $res;
-    },
-);
-
-test_request(
     name => 'no progress',
     req => [call => "/Test/Perinci/Access/Schemeless2/no_progress", {}],
     status => 500,
@@ -801,6 +791,23 @@ test_request(
     req => [call => '/Test/Perinci/Access/Schemeless2/test_uws', {args=>{x=>1}}],
     status => 400,
 );
+
+subtest 'opt: set_function_properties' => sub {
+    plan skip_all => 'Currently release testing only'
+        unless $ENV{RELEASE_TESTING};
+
+    test_request(
+        name => 'opt: set_function_properties',
+        object_opts=>{set_function_properties=>{retry=>1}},
+        req => [meta => '/Test/Perinci/Access/Schemeless/f1'],
+        status => 200,
+        posttest => sub {
+            my ($res) = @_;
+            my $meta = $res->[2];
+            ok($meta->{retry}) or diag explain $meta;
+        },
+    );
+};
 
 subtest "parse_url" => sub {
     my $pa = Perinci::Access::Schemeless->new;
