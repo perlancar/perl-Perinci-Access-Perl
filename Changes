@@ -1,5 +1,32 @@
 Revision history for Perinci-Access-Perl
 
+0.66     2014-04-30 (SHARYANTO)
+
+         [ENHANCEMENTS]
+
+         - meta action: Now uses Perinci::Sub::Normalize instead of
+           Perinci::Sub::Wrapper to reduce startup overhead in things like
+           Perinci::CmdLine's --help or autocompletion (which only request
+           'meta' action). In other words, we now decouple metadata
+           normalization and wrapping.
+
+         [REMOVED FEATURES]
+
+         - Remove 'extra_wrapper_args' option (it's not used so far, except for
+           turning off wrapping in Perinci::CmdLine in completion mode to reduce
+           startup overhead).
+
+         - meta action: Remove returning 'orig_meta' in result metadata (so far
+           it's only used by Perinci::To::Doc when wanting to know the original
+           value of 'result_naked' and 'args_as' properties). This can now be
+           done via the 'normalize_metadata'=>0 option.
+
+         [INCOMPATIBLE CHANGES]
+
+         - Rename option 'extra_wrapper_convert' to 'set_function_properties'
+           (the new name is more abstract and less low-level).
+
+
 0.65     2014-04-16 (SHARYANTO)
 
          - Set 'entity_date' property from $DATE package variable.
