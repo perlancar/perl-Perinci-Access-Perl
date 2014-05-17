@@ -7,7 +7,7 @@ use experimental 'smartmatch';
 use FindBin '$Bin';
 use lib "$Bin/lib";
 
-use File::Slurp;
+use File::Slurp::Tiny qw(write_file);
 use File::Temp qw(tempdir);
 use Test::More 0.96;
 
