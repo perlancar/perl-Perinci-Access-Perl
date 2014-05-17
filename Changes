@@ -1,5 +1,12 @@
 Revision history for Perinci-Access-Perl
 
+0.67     2014-05-17 (SHARYANTO)
+
+         - No functional changes.
+
+         - Replace File::Slurp with File::Slurp::Tiny.
+
+
 0.66     2014-04-30 (SHARYANTO)
 
          [ENHANCEMENTS]
