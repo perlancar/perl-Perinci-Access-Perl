@@ -539,9 +539,10 @@ subtest "action: actions" => sub {
         name => 'actions on function',
         req => [actions => "/Perinci/Examples/gen_array"],
         status => 200,
-        result => [qw/actions begin_tx call commit_tx complete_arg_val
-                      discard_all_txs discard_tx info list_txs meta redo
-                      release_tx_savepoint rollback_tx savepoint_tx undo/],
+        result => [qw/actions begin_tx call commit_tx complete_arg_elem
+                      complete_arg_val discard_all_txs discard_tx info list_txs
+                      meta redo release_tx_savepoint rollback_tx savepoint_tx
+                      undo/],
     );
     test_request(
         name => 'actions on variable',
