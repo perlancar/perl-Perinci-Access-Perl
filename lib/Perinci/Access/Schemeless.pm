@@ -718,6 +718,29 @@ sub action_complete_arg_val {
                                               arg=>$arg, ci=>$ci) // []];
 }
 
+sub actionmeta_complete_arg_elem { +{
+    applies_to => ['function'],
+    summary    => "Complete function's argument element value"
+} }
+
+sub action_complete_arg_elem {
+    require Perinci::Sub::Complete;
+
+    my ($self, $req) = @_;
+    my $arg = $req->{arg} or return err(400, "Please specify arg");
+    defined(my $index = $req->{index})
+        or return err(400, "Please specify index");
+    my $word = $req->{word} // "";
+    my $ci = $req->{ci};
+
+    my $res = $self->get_meta($req);
+    return $res if $res;
+    [200, "OK (complete_arg_elem action)",
+     Perinci::Sub::Complete::complete_arg_elem(
+         meta=>$req->{-meta}, word=>$word, arg=>$arg, ci=>$ci, index=>$index,
+     ) // []],
+}
+
 sub actionmeta_child_metas { +{
     applies_to => ['package'],
     summary    => "Get metadata of all child entities",
