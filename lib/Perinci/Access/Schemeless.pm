@@ -56,7 +56,7 @@ sub new {
     }
     $self->{_typeacts} = \%typeacts;
 
-    $self->{cache_size}              //= 100; # for caching metadata & coded
+    $self->{cache_size}              //= 100; # for caching metadata & code
     #$self->{use_tx}                  //= 0;
     $self->{wrap}                    //= 1;
     #$self->{custom_tx_manager}       //= undef;
