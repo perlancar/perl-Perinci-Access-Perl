@@ -1,5 +1,14 @@
 Revision history for Perinci-Access-Perl
 
+0.69     2014-06-25 (SHARYANTO)
+
+         - No functional changes.
+
+         - Replace ModuleOrPrefix::Path with SHARYANTO::Module::Path (the
+           former's functionality has been included in the latter, thus the
+           former is removed from CPAN).
+
+
 0.68     2014-06-18 (SHARYANTO)
 
          - Add action: complete_arg_elem (Riap 1.1.23).
