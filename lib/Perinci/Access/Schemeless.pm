@@ -12,7 +12,7 @@ use Perinci::Object;
 use Perinci::Sub::Normalize qw(normalize_function_metadata);
 use Perinci::Sub::Util qw(err);
 use Scalar::Util qw(blessed reftype);
-use ModuleOrPrefix::Path qw(module_or_prefix_path);
+use SHARYANTO::Module::Path qw(module_path);
 use SHARYANTO::Package::Util qw(package_exists);
 use Tie::Cache;
 use URI::Split qw(uri_split uri_join);
@@ -243,7 +243,7 @@ sub _load_module {
     # load and cache negative result
     my $res;
     {
-        my $fullpath = module_or_prefix_path($module_p);
+        my $fullpath = module_path(module=>$module_p, find_pmc=>0);
 
         # when the module path does not exist, but the package does, we can
         # ignore this error. for example: main, CORE, etc.
