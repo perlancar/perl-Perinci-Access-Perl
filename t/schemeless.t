@@ -681,13 +681,6 @@ subtest "action: complete_arg_val" => sub {
         result => [1, 10..19],
     );
     test_request(
-        name => 'complete: int\'s min+max range too big = not completed',
-        req => [complete_arg_val => "/Perinci/Examples/test_completion",
-                {arg=>"i2", word=>"1"}],
-        status => 200,
-        result => [],
-    );
-    test_request(
         name => 'complete: sub',
         req => [complete_arg_val => "/Perinci/Examples/test_completion",
                 {arg=>"s2", word=>"z"}],
