@@ -1,5 +1,13 @@
 Revision history for Perinci-Access-Perl
 
+0.70     2014-08-24 (SHARYANTO)
+
+         - No functional changes.
+
+         - [Bugfix] Meta on /blah (non-package entity directly under /) should
+           return 404 status, not empty meta.
+
+
 0.69     2014-06-25 (SHARYANTO)
 
          - No functional changes.
