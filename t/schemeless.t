@@ -479,6 +479,11 @@ subtest "action: meta" => sub {
         status => 200,
     );
     test_request(
+        name => 'meta on non-package under / = 404',
+        req => [meta => sprintf "/%016d", rand()*1e16],
+        status => 404,
+    );
+    test_request(
         name => 'meta on package',
         req => [meta => "/Test/Perinci/Access/Schemeless/"],
         status => 200,

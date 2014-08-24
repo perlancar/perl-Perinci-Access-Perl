@@ -298,15 +298,21 @@ sub get_meta {
 
     my ($self, $req) = @_;
 
-    if (!$req->{-perl_package}) {
-        $req->{-meta} = {v=>1.1}; # empty metadata for /
-        return;
+    my $pkg  = $req->{-perl_package};
+    my $leaf = $req->{-uri_leaf};
+    my $type = $req->{-type};
+    if (!length($pkg)) {
+        if (length $leaf) {
+            # 404 for all non-subpackage entity directly under /
+            return [404, "No metadata for ::$leaf"];
+        } else {
+            # empty metadata for root (/)
+            $req->{-meta} = {v=>1.1};
+            return;
+        }
     }
 
-    my $type = $req->{-type};
-    my $pkg  = $req->{-perl_package};
-
-    my $name = "$pkg\::$req->{-uri_leaf}";
+    my $name = "$pkg\::$leaf";
     if ($self->{_meta_cache}{$name}) {
         $req->{-meta} = $self->{_meta_cache}{$name};
         return;
@@ -319,7 +325,7 @@ sub get_meta {
 
     my $meta;
     my $metas = \%{"$pkg\::SPEC"};
-    $meta = $metas->{ $req->{-uri_leaf} || ":package" };
+    $meta = $metas->{ $leaf || ":package" };
 
     if (!$meta && $type eq 'package') {
         $meta = {v=>1.1};
