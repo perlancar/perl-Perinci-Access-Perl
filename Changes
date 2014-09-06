@@ -1,5 +1,13 @@
 Revision history for Perinci-Access-Perl
 
+0.71     2014-09-06 (PERLANCAR)
+
+         - No functional changes.
+
+         - Force upgrade to Perinci::Sub::Wrapper 0.62 (rename
+           x.perinci.wrapper.* metadata attributes).
+
+
 0.70     2014-08-24 (SHARYANTO)
 
          - No functional changes.
