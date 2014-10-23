@@ -1,5 +1,15 @@
 Revision history for Perinci-Access-Perl
 
+0.72     2014-10-23 (PERLANCAR)
+
+         - Bump Riap support to 1.2 (no longer produces v=>1.1 keys on info
+           response). Note that we don't check riap.* keys on result metadata
+           because they are only supposed to be produced by (network) servers,
+           and this is an in-process (serverless) Riap client.
+
+         - Fix typo: unimplemented status is 501, not 502.
+
+
 0.71     2014-09-06 (PERLANCAR)
 
          - No functional changes.
