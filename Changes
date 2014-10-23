@@ -1,5 +1,12 @@
 Revision history for Perinci-Access-Perl
 
+0.73    2014-10-23 (PERLANCAR)
+
+	- No functional changes.
+
+	- Bump dependency version.
+
+
 0.72     2014-10-23 (PERLANCAR)
 
          - Bump Riap support to 1.2 (no longer produces v=>1.1 keys on info
