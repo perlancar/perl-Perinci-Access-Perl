@@ -501,7 +501,6 @@ sub action_info {
     return $mres if $mres;
 
     my $res = {
-        v    => 1.1,
         uri  => $req->{uri},
         type => $req->{-type},
     };
@@ -601,7 +600,6 @@ sub action_list {
         next if $f_type && $f_type ne $t;
         if ($detail) {
             push @res, {
-                #v=>1.1,
                 uri=>$e, type=>$t,
             };
         } else {

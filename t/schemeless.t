@@ -289,17 +289,17 @@ subtest "failure in loading module" => sub {
 test_request(
     name => 'unknown action',
     req => [zzz => "/"],
-    status => 502,
+    status => 501,
 );
 test_request(
     name => 'unknown action for a type (1)',
     req => [call => "/"],
-    status => 502,
+    status => 501,
 );
 test_request(
     name => 'unknown action for a type (2)',
     req => [list => "/Bar/f1"],
-    status => 502,
+    status => 501,
 );
 
 subtest "opt: {allow,deny}_schemes" => sub {
@@ -313,13 +313,13 @@ subtest "opt: {allow,deny}_schemes" => sub {
         name => "allow_schemes doesn't match",
         object_opts => {allow_schemes=>['foo']},
         req => [meta => "/Perinci/Examples/"],
-        status => 502,
+        status => 501,
     );
     test_request(
         name => 'deny_schemes matches',
         object_opts => {deny_schemes=>['foo']},
         req => [meta => "foo:/Perinci/Examples/"],
-        status => 502,
+        status => 501,
     );
     test_request(
         name => "deny_schemes doesn't match",
@@ -456,19 +456,19 @@ subtest "action: info" => sub {
         name => "info on / works",
         req => [info => "/"],
         status => 200,
-        result => {v=>1.1, uri=>"/", type=>"package"},
+        result => {uri=>"/", type=>"package"},
     );
     test_request(
         name => 'info on package',
         req => [info => "/Foo/"],
         status => 200,
-        result => {v=>1.1, uri=>'/Foo/', type=>'package'},
+        result => {uri=>'/Foo/', type=>'package'},
     );
     test_request(
         name => 'info on function',
         req => [info => "/Baz/f1"],
         status => 200,
-        result => {v=>1.1, uri=>'/Baz/f1', type=>'function'},
+        result => {uri=>'/Baz/f1', type=>'function'},
     );
 };
 

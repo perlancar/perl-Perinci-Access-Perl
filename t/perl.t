@@ -15,8 +15,8 @@ my $pa_cached;
 
 subtest "request" => sub {
     subtest "only pl scheme is accepted" => sub {
-        test_request(req => [info => "foo:/"], status=>502);
-        test_request(req => [info => "pm:/"] , status=>502);
+        test_request(req => [info => "foo:/"], status=>501);
+        test_request(req => [info => "pm:/"] , status=>501);
         test_request(req => [info => "pl:/"] , status=>200);
         test_request(req => [info => "/"]    , status=>200);
     };
