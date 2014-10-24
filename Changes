@@ -1,5 +1,10 @@
 Revision history for Perinci-Access-Perl
 
+0.74    2014-10-24 (PERLANCAR)
+
+	- Give hint in result metadata when result is binary (buf).
+
+
 0.73    2014-10-23 (PERLANCAR)
 
 	- No functional changes.
