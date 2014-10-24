@@ -699,6 +699,14 @@ sub action_call {
         }
     }
 
+    # add hint that result is binary
+    if (defined $res->[2]) {
+        if ($req->{-meta}{result} && $req->{-meta}{result}{schema} &&
+                $req->{-meta}{result}{schema}[0] eq 'buf') {
+            $res->[3]{'x.hint.result_binary'} = 1;
+        }
+    }
+
     $res;
 }
 
