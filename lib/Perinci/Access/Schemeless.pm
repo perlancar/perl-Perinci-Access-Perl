@@ -1204,6 +1204,16 @@ the Riap request key 'uri', as there is no server in this case.
 =head2 $pa->parse_url($server_url) => HASH
 
 
+=head1 ADDED RESULT METADATA
+
+This class might add the following property/attribute in result metadata:
+
+=head2 x.hint.result_binary => bool
+
+If result's schema type is C<buf>, then this class will set this attribute to
+true, to give hints to result formatters.
+
+
 =head1 SEE ALSO
 
 L<Riap>, L<Rinci>
