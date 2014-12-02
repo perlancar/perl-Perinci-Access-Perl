@@ -1,5 +1,13 @@
 Revision history for Perinci-Access-Perl
 
+0.75    2014-12-02 (PERLANCAR)
+
+	- [Bugfix] Module prefix like Foo was not found if Foo.pm does not
+	  also exist, because we used Foo.pm.
+
+	- Document about x.hint.result_binary.
+
+
 0.74    2014-10-24 (PERLANCAR)
 
 	- Give hint in result metadata when result is binary (buf).
