@@ -243,7 +243,7 @@ sub _load_module {
     # load and cache negative result
     my $res;
     {
-        my $fullpath = module_path(module=>$module_p, find_pmc=>0);
+        my $fullpath = module_path(module=>$pkg, find_pmc=>0, find_prefix=>1);
 
         # when the module path does not exist, but the package does, we can
         # ignore this error. for example: main, CORE, etc.
