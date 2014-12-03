@@ -1,5 +1,12 @@
 Revision history for Perinci-Access-Perl
 
+0.76    2014-12-03 (PERLANCAR)
+
+	- No functional changes.
+
+	- Switch {SHARYANTO::Module::Path,Module::Path::More}.
+
+
 0.75    2014-12-02 (PERLANCAR)
 
 	- [Bugfix] Module prefix like Foo was not found if Foo.pm does not
