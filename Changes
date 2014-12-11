@@ -1,5 +1,13 @@
 Revision history for Perinci-Access-Perl
 
+0.78    2014-12-11 (PERLANCAR)
+
+	- No functional changes.
+
+	- [Bugfix] Forgot to update test regarding change to periscomp (now
+	  returns completion answer in hashform) [CT].
+
+
 0.77    2014-12-05 (PERLANCAR)
 
 	- No functional changes.
