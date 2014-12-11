@@ -676,21 +676,21 @@ subtest "action: complete_arg_val" => sub {
         req => [complete_arg_val => "/Perinci/Examples/test_completion",
                 {arg=>"s1", word=>"r"}],
         status => 200,
-        result => ["red date", "red grape"],
+        result => {static=>0, words=>["red date", "red grape"]},
     );
     test_request(
         name => 'complete: int\'s min+max',
         req => [complete_arg_val => "/Perinci/Examples/test_completion",
                 {arg=>"i1", word=>"1"}],
         status => 200,
-        result => [1, 10..19],
+        result => {static=>0, words=>[1, 10..19]},
     );
     test_request(
         name => 'complete: sub',
         req => [complete_arg_val => "/Perinci/Examples/test_completion",
                 {arg=>"s2", word=>"z"}],
         status => 200,
-        result => ["za".."zz"],
+        result => {static=>0, words=>["za".."zz"]},
     );
     test_request(
         name => 'complete: sub die trapped',
