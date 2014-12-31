@@ -335,7 +335,13 @@ sub get_meta {
         $meta = {v=>1.1};
     }
 
-    return err(404, "No metadata for $name") unless $meta;
+    return err(404,
+               join("",
+                    "No metadata for $name (package '$pkg' exists, ",
+                    "perhaps you mentioned '$pkg' ",
+                    "somewhere without actually loading the module, or ",
+                    "perhaps '$leaf' is a typo?)",
+                )) unless $meta;
 
     if ($res) {
         if ($res->[0] == 405) {
