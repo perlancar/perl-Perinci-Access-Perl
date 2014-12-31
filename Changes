@@ -1,5 +1,12 @@
 Revision history for Perinci-Access-Perl
 
+0.79    2014-12-31 (PERLANCAR)
+
+	- No functional changes.
+
+	- Add more helpful error message for 'No metadata for ...'.
+
+
 0.78    2014-12-11 (PERLANCAR)
 
 	- No functional changes.
