@@ -306,7 +306,7 @@ sub get_meta {
             # 404 for all non-subpackage entity directly under /
             return [404, "No metadata for ::$leaf (".
                 (package_exists($pkg) ? "package '$pkg' exists, perhaps you mentioned '$pkg' somewhere without actually loading the module, or perhaps '$leaf' is a typo?" :
-                     "package '$pkg' doesn't exist, perhaps '$modpath' or '$leaf' is a typo?").
+                     "package '$pkg' doesn't exist, perhaps '$pkg' or '$leaf' is a typo?").
                     ")"
             ];
         } else {
