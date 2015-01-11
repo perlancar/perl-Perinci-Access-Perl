@@ -14,7 +14,7 @@ use parent qw(Perinci::Access::Base);
 use Perinci::Object;
 use Perinci::Sub::Normalize qw(normalize_function_metadata);
 use Perinci::Sub::Util qw(err);
-use Scalar::Util qw(blessed reftype);
+use Scalar::Util qw(blessed);
 use Module::Path::More qw(module_path);
 use Package::MoreUtil qw(package_exists);
 use Tie::Cache;
@@ -820,7 +820,7 @@ sub _pre_tx_action {
         unless $self->{use_tx};
 
     # instantiate custom tx manager, per request if necessary
-    if ((reftype($self->{custom_tx_manager}) // '') eq 'CODE') {
+    if (ref($self->{custom_tx_manager}) eq 'CODE') {
         eval {
             $self->{_tx_manager} = $self->{custom_tx_manager}->($self);
             die $self->{_tx_manager} unless blessed($self->{_tx_manager});
