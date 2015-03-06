@@ -9,6 +9,7 @@ use lib "$Bin/lib";
 
 use File::Slurp::Tiny qw(write_file);
 use File::Temp qw(tempdir);
+use Monkey::Patch::Action qw(patch_package);
 use Test::More 0.96;
 
 use Perinci::Access::Schemeless;
@@ -95,6 +96,10 @@ sub has_progress {
 
 $SPEC{test_uws} = {v=>1.1, args=>{a=>{}}};
 sub test_uws { [200] }
+
+# this metadata marks that argument has been validated and that periap shouldn't wrap again
+$SPEC{test_double_wrap1} = {v=>1.1, args=>{a=>{}}, 'x.perinci.sub.wrapper.logs'=>[{validate_args=>1}]};
+sub test_double_wrap1 { [200] }
 
 package main;
 
@@ -448,6 +453,14 @@ subtest 'schema in metadata is normalized' => sub {
                 {normalize_schema=>1, validate_args=>1, validate_result=>1},
             ],
         },
+    );
+};
+
+subtest "avoid double wrapping" => sub {
+    my $h = patch_package("Perinci::Sub::Wrapper", "wrap_sub", "replace", sub { say "WRAPPING AGAIN!"; die });
+    test_request(
+        req => [call => "/Test/Perinci/Access/Schemeless2/test_double_wrap1"],
+        status => 200,
     );
 };
 
