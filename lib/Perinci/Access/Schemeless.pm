@@ -11,6 +11,7 @@ use Log::Any '$log';
 
 use parent qw(Perinci::Access::Base);
 
+use List::Util qw(first);
 use Perinci::Object;
 use Perinci::Sub::Normalize qw(normalize_function_metadata);
 use Perinci::Sub::Util qw(err);
@@ -412,8 +413,9 @@ sub get_code {
     {
         # we don't need to wrap
         if (!$self->{wrap} ||
-                ($meta->{"x.perinci.sub.wrapper.logs"} &&
-                     $meta->{"x.perinci.sub.wrapper.logs"}[-1]{embed})
+                $meta->{"x.perinci.sub.wrapper.logs"} &&
+                    (first {$_->{validate}}
+                         @{ $meta->{"x.perinci.sub.wrapper.logs"} })
             ) {
             $code = \&{$name};
             last GET_CODE;
