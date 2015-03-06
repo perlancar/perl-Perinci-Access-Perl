@@ -414,7 +414,7 @@ sub get_code {
         # we don't need to wrap
         if (!$self->{wrap} ||
                 $meta->{"x.perinci.sub.wrapper.logs"} &&
-                    (first {$_->{validate}}
+                    (first {$_->{validate_args}}
                          @{ $meta->{"x.perinci.sub.wrapper.logs"} })
             ) {
             $code = \&{$name};
