@@ -1,5 +1,12 @@
 Revision history for Perinci-Access-Perl
 
+0.81    2015-03-06 (PERLANCAR)
+
+	- No functional changes.
+
+	- [Bugfix] Fix key name, d'oh.
+
+
 0.80    2015-03-06 (PERLANCAR)
 
 	- Fix/tweak criteria of whether we should wrap (don't wrap if
