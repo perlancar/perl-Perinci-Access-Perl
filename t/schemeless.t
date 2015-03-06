@@ -459,8 +459,8 @@ subtest 'schema in metadata is normalized' => sub {
 subtest "avoid double wrapping" => sub {
     my $h = patch_package("Perinci::Sub::Wrapper", "wrap_sub", "replace", sub { say "WRAPPING AGAIN!"; die });
     test_request(
-        #req => [call => "/Test/Perinci/Access/Schemeless2/test_double_wrap1"],
-        req => [call => "/App/GenPericmdScript/gen_perinci_cmdline_script"],
+        req => [call => "/Test/Perinci/Access/Schemeless2/test_double_wrap1"],
+        #req => [call => "/App/GenPericmdScript/gen_perinci_cmdline_script"],
         status => 200,
     );
 };
