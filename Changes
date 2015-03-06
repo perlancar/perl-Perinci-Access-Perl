@@ -1,5 +1,17 @@
 Revision history for Perinci-Access-Perl
 
+0.80    2015-03-06 (PERLANCAR)
+
+	- Fix/tweak criteria of whether we should wrap (don't wrap if
+	  argument is already validated).
+
+	- Remove support for old attribute name x.perinci.sub.wrapper.log.
+
+	- Use good ol' ref() again instead of Scalar::Util::reftype(),
+	  because I'm no longer blessing Perinci::Sub::Wrapper-wrapped
+	  subroutines.
+
+
 0.79    2014-12-31 (PERLANCAR)
 
 	- No functional changes.
