@@ -1,5 +1,12 @@
 Revision history for Perinci-Access-Perl
 
+0.83    2015-08-18 (PERLANCAR)
+
+	- No functional changes.
+
+	- Switch from Log::Any to Log::Any::IfLOG.
+
+
 0.82    2015-03-06 (PERLANCAR)
 
 	- No functional changes.
