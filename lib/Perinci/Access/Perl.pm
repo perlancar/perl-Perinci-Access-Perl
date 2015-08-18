@@ -1,5 +1,8 @@
 package Perinci::Access::Perl;
 
+# DATE
+# VERSION
+
 use 5.010001;
 use strict;
 use warnings;
@@ -7,8 +10,6 @@ use warnings;
 use URI::Split qw(uri_split);
 
 use parent qw(Perinci::Access::Schemeless);
-
-# VERSION
 
 sub new {
     my $class = shift;
