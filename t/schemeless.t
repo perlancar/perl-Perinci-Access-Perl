@@ -420,7 +420,9 @@ subtest 'schema in metadata is normalized' => sub {
                 schema => ['int'=>{req=>1}, {}],
             },
             result_naked=>0,
+            _orig_result_naked=>undef,
             args_as=>'hash',
+            _orig_args_as=>undef,
             entity_v=>1.2,
             _internal1=>1,
         },
@@ -446,7 +448,9 @@ subtest 'schema in metadata is normalized' => sub {
                 schema => ['int'=>{req=>1}, {}],
             },
             result_naked=>0,
+            _orig_result_naked=>undef,
             args_as=>'hash',
+            _orig_args_as=>undef,
             entity_v=>1.2,
             _internal1=>1,
             "x.perinci.sub.wrapper.logs" => [
@@ -522,7 +526,7 @@ subtest "action: meta" => sub {
         object_opts=>{wrap=>0},
         req => [meta => "/Bar/f1"],
         status => 200,
-        result => {v=>1.1, args=>{}, result_naked=>0, args_as=>'hash', entity_v => 0.123, entity_date=>'1999-01-01'},
+        result => {v=>1.1, args=>{}, result_naked=>0, _orig_result_naked=>undef, args_as=>'hash', _orig_args_as=>undef, entity_v => 0.123, entity_date=>'1999-01-01'},
     );
     test_request(
         name => 'meta on package (entity_v not overridden)',
@@ -536,7 +540,7 @@ subtest "action: meta" => sub {
         object_opts=>{wrap=>0},
         req => [meta => "/Baz/f1"],
         status => 200,
-        result => {v=>1.1, entity_v=>10, args=>{}, result_naked=>0, args_as=>'hash'},
+        result => {v=>1.1, entity_v=>10, args=>{}, _orig_result_naked=>undef, result_naked=>0, args_as=>'hash', _orig_args_as=>undef},
     );
     test_request(
         name => 'ending slash matters',
@@ -736,6 +740,7 @@ test_request(
                     schema => ['int'=>{req=>1}, {}],
                 },
                 args_as => 'hash', result_naked => 0,
+                _orig_args_as => undef, _orig_result_naked => undef,
                 entity_v=>1.2,
                 "x.perinci.sub.wrapper.logs" => [
                     {normalize_schema=>1, validate_args=>1, validate_result=>1},
@@ -745,13 +750,16 @@ test_request(
         'f2' =>
             {
                 v=>1.1,
-                args => {}, args_as => 'hash', result_naked => 0,
+                args => {},
+                args_as => 'hash', result_naked => 0,
+                _orig_args_as => undef, _orig_result_naked => undef,
                 entity_v=>1.2,
             },
         'req_confirm' =>
             {
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,
+                _orig_args_as => undef, _orig_result_naked => undef,
                 entity_v=>1.2,
                 features=>{},
                 "x.perinci.sub.wrapper.logs" => [
@@ -762,6 +770,7 @@ test_request(
             {
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,
+                _orig_args_as => undef, _orig_result_naked => undef,
                 entity_v=>1.2,
                 features => {dry_run=>1},
                 "x.perinci.sub.wrapper.logs" => [
@@ -772,6 +781,7 @@ test_request(
             {
                 v=>1.1,
                 args_as => 'hash', result_naked => 0,
+                _orig_args_as => undef, _orig_result_naked => undef,
                 entity_v=>1.2,
                 features => {tx=>{v=>2}, idempotent=>1},
                 "x.perinci.sub.wrapper.logs" => [

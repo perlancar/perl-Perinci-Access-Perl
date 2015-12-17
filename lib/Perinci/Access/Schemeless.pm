@@ -62,7 +62,6 @@ sub new {
     $self->{wrap}                    //= 1;
     #$self->{custom_tx_manager}       //= undef;
     $self->{load}                    //= 1;
-    $self->{set_function_properties} //= {};
     $self->{normalize_metadata}      //= 1;
     #$self->{after_load}
     #$self->{allow_paths}
@@ -320,6 +319,8 @@ sub get_meta {
     my $name = "$pkg\::$leaf";
     if ($self->{_meta_cache}{$name}) {
         $req->{-meta} = $self->{_meta_cache}{$name};
+        $req->{-orig_meta} = $self->{_orig_meta_cache}{$name}
+            if $self->{_orig_meta_cache}{$name};
         return;
     }
 
@@ -360,10 +361,17 @@ sub get_meta {
         }
 
         $meta->{args} //= {};
+        $meta->{_orig_args_as} = $meta->{args_as};
         $meta->{args_as} = 'hash';
+        $meta->{_orig_result_naked} = $meta->{result_naked};
         $meta->{result_naked} = 0;
         my $sfp = $self->{set_function_properties};
-        $meta->{$_} = $sfp->{$_} for keys %$sfp;
+        if ($sfp) {
+            for (keys %$sfp) {
+                $meta->{"_orig_$_"} = $meta->{$_};
+                $meta->{$_} = $sfp->{$_};
+            }
+        }
     }
 
     __inject_entity_v_date($req, $meta);
@@ -422,10 +430,12 @@ sub get_code {
         }
 
         require Perinci::Sub::Wrapper;
+        my $sfp = $self->{set_function_properties};
+
         my $wrapres = Perinci::Sub::Wrapper::wrap_sub(
             sub_name=>$name, meta=>$meta,
             convert=>{args_as=>'hash', result_naked=>0,
-                      %{$self->{set_function_properties}},
+                      ($sfp ? %$sfp : ())
                   });
         return err(500, "Can't wrap function", $wrapres)
             unless $wrapres->[0] == 200;
@@ -437,9 +447,16 @@ sub get_code {
             # request can use this. the metadata from wrapper contains wrapper
             # logs (x.perinci.sub.wrapper.logs) which can be helpful hint for
             # some uses.
-            my $meta   = $wrapres->[2]{meta};
-            __inject_entity_v_date($req, $meta);
-            $self->{_meta_cache}{$name} = $meta;
+            my $newmeta = $wrapres->[2]{meta};
+            $newmeta->{_orig_result_naked} = $meta->{result_naked};
+            $newmeta->{_orig_args_as}      = $meta->{args_as};
+            if ($sfp) {
+                for (keys %$sfp) {
+                    $newmeta->{"_orig_$_"} = $meta->{$_};
+                }
+            }
+            __inject_entity_v_date($req, $newmeta);
+            $self->{_meta_cache}{$name} = $newmeta;
         }
     }
 
