@@ -1,5 +1,14 @@
 Revision history for Perinci-Access-Perl
 
+0.85    2015-12-17 (PERLANCAR)
+
+	- Return original value of args_as and result_naked in
+	  _orig_args_as and _orig_result_naked respectively, for client
+	  libraries like Perinci::To::Doc which might need the information.
+
+	- Bump prereq version Log::Any::IfLOG to 0.07.
+
+
 0.84    2015-09-03 (PERLANCAR)
 
 	- No functional changes.
