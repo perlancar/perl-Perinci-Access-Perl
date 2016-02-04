@@ -1,5 +1,11 @@
 Revision history for Perinci-Access-Perl
 
+0.86    2016-02-04 (PERLANCAR)
+
+	- Fix regex for Perl package name (0-9 is allowed for subpackage
+	  prefix).
+
+
 0.85    2015-12-17 (PERLANCAR)
 
 	- Return original value of args_as and result_naked in
