@@ -22,7 +22,7 @@ use Tie::Cache;
 use URI::Split qw(uri_split uri_join);
 
 our $re_perl_package =
-    qr/\A[A-Za-z_][A-Za-z_0-9]*(::[A-Za-z_][A-Za-z_0-9]*)*\z/;
+    qr/\A[A-Za-z_][A-Za-z_0-9]*(::[A-Za-z_0-9][A-Za-z_0-9]*)*\z/;
 
 sub new {
     require Class::Inspector;
