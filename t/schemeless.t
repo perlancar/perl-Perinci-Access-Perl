@@ -7,7 +7,7 @@ use experimental 'smartmatch';
 use FindBin '$Bin';
 use lib "$Bin/lib";
 
-use File::Slurp::Tiny qw(write_file);
+use File::Slurper qw(write_text);
 use File::Temp qw(tempdir);
 use Monkey::Patch::Action qw(patch_package);
 use Test::More 0.96;
@@ -200,8 +200,8 @@ subtest "failure in loading module" => sub {
         last unless $prefix eq $prefix2;
     }
     mkdir "$tmpdir/$prefix";
-    write_file "$tmpdir/$prefix/OK.pm", "package $prefix\::OK; 1;";
-    write_file "$tmpdir/$prefix/Err.pm", "package $prefix\::Err; 1=;";
+    write_text "$tmpdir/$prefix/OK.pm", "package $prefix\::OK; 1;";
+    write_text "$tmpdir/$prefix/Err.pm", "package $prefix\::Err; 1=;";
     test_request(
         name => "ok",
         object_opts=>{}, # so it creates a new riap client and defeat cache
