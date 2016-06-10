@@ -1,5 +1,15 @@
 Revision history for Perinci-Access-Perl
 
+0.87    2016-06-10 (PERLANCAR)
+
+	- No functional changes.
+
+	- [test] Replace File::Slurp::Tiny with File::Slurper.
+
+	- [dist] Bump prereq version Perinci::Sub::Normalize -> 0.18,
+	  Perinci::Sub::Wrapper -> 0.83.
+
+
 0.86    2016-02-04 (PERLANCAR)
 
 	- Fix regex for Perl package name (0-9 is allowed for subpackage
