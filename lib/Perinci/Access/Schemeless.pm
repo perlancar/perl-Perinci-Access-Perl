@@ -7,7 +7,7 @@ use 5.010001;
 use strict;
 use warnings;
 use experimental 'smartmatch';
-use Log::Any::IfLOG '$log';
+use Log::ger;
 
 use parent qw(Perinci::Access::Base);
 
@@ -266,7 +266,7 @@ sub _load_module {
         # load is successful
         if ($self->{after_load}) {
             eval { $self->{after_load}($self, module=>$pkg) };
-            $log->error("after_load for package $pkg dies: $@") if $@;
+            log_error("after_load for package $pkg dies: $@") if $@;
         }
     }
     $loadcache{$module_p} = $res;
