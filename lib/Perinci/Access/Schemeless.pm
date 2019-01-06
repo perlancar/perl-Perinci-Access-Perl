@@ -17,7 +17,7 @@ use Perinci::Sub::Normalize qw(normalize_function_metadata);
 use Perinci::Sub::Util qw(err);
 use Scalar::Util qw(blessed);
 use Module::Path::More qw(module_path);
-use Package::MoreUtil qw(package_exists);
+use Package::Util::Lite qw(package_exists);
 use Tie::Cache;
 use URI::Split qw(uri_split uri_join);
 
