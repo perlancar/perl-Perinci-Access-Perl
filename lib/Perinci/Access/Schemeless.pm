@@ -775,7 +775,7 @@ sub action_complete_arg_elem {
     [200, "OK (complete_arg_elem action)",
      Perinci::Sub::Complete::complete_arg_elem(
          meta=>$req->{-meta}, word=>$word, arg=>$arg, ci=>$ci, index=>$index,
-     ) // []],
+     ) // []];
 }
 
 sub actionmeta_child_metas { +{
