@@ -1,3 +1,9 @@
+0.896   2021-08-01  Released-By: PERLANCAR; Urgency: medium
+
+	- Add a test prereq to Data::Sah:Resolve to force installing
+	  0.010+.
+
+
 0.895   2021-08-01  Released-By: PERLANCAR; Urgency: medium
 
 	- Update test to newer Data::Sah::Normalize (0.051) (RT#138213).
