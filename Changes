@@ -1,3 +1,9 @@
+0.897   2021-08-01  Released-By: PERLANCAR; Urgency: medium
+
+	- Replace test dependency-to-Data::Sah::Resolve 0.10 to test
+	  dependency to Data::Sah 0.910 (RT#138213).
+
+
 0.896   2021-08-01  Released-By: PERLANCAR; Urgency: medium
 
 	- Add a test prereq to Data::Sah:Resolve to force installing
