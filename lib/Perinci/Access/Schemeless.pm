@@ -260,7 +260,7 @@ sub _load_module {
             $res = [405, "Can only find a prefix path for package $pkg"];
             last;
         }
-        eval $source;
+        eval $source; ## no critic: BuiltinFunctions::ProhibitStringyEval
         if ($@) {
             die if $ENV{PERINCI_ACCESS_SCHEMELESS_DEBUG};
             $res = [500, "Can't load module $pkg (probably compile error): $@"];
@@ -281,7 +281,7 @@ sub _load_module {
 }
 
 sub __inject_entity_v_date {
-    no strict 'refs';
+    no strict 'refs'; ## no critic: TestingAndDebugging::ProhibitNoStrict
 
     my ($req, $meta) = @_;
 
@@ -301,7 +301,7 @@ sub __inject_entity_v_date {
 }
 
 sub get_meta {
-    no strict 'refs';
+    no strict 'refs'; ## no critic: TestingAndDebugging::ProhibitNoStrict
 
     my ($self, $req) = @_;
 
@@ -415,7 +415,7 @@ sub get_code {
     # original metadata
     my $meta;
     {
-        no strict 'refs';
+        no strict 'refs'; ## no critic: TestingAndDebugging::ProhibitNoStrict
         my $metas = \%{"$req->{-perl_package}::SPEC"};
         $meta = $metas->{ $req->{-uri_leaf} || ":package" };
     }
@@ -473,7 +473,7 @@ sub get_code {
 }
 
 sub request {
-    no strict 'refs';
+    no strict 'refs'; ## no critic: TestingAndDebugging::ProhibitNoStrict
 
     my ($self, $action, $uri, $extra) = @_;
 
@@ -621,7 +621,7 @@ sub action_list {
     return $res if $res && $res->[0] != 405;
 
     # get all entities from this module
-    no strict 'refs';
+    no strict 'refs'; ## no critic: TestingAndDebugging::ProhibitNoStrict
     my $spec = \%{"$req->{-perl_package}\::SPEC"};
     my $dir = $req->{-uri_dir};
     for my $e (sort keys %$spec) {
@@ -818,7 +818,7 @@ sub actionmeta_get { +{
 } }
 
 sub action_get {
-    no strict 'refs';
+    no strict 'refs'; ## no critic: TestingAndDebugging::ProhibitNoStrict
 
     my ($self, $req) = @_;
     local $req->{-uri_leaf} = $req->{-uri_leaf};

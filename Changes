@@ -1,3 +1,12 @@
+0.895   2022-06-10  Released-By: PERLANCAR; Urgency: medium
+
+        - Replace Module::Path::More with Module::Installed::Tiny to
+          support require hooks.
+
+        - Update tests to adjust with Data::Sah::Normalize 0.051 & Sah
+          0.9.47 (no more extras part in schema).
+
+
 0.894   2021-05-11  Released-By: PERLANCAR; Urgency: medium
 
 	- Adjust to Perinci::Examples 0.821 (RT#136458).
