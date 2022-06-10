@@ -1,10 +1,5 @@
 package Perinci::Access::Schemeless;
 
-# AUTHORITY
-# DATE
-# DIST
-# VERSION
-
 use 5.010001;
 use strict;
 use warnings;
@@ -18,10 +13,15 @@ use Perinci::Object;
 use Perinci::Sub::Normalize qw(normalize_function_metadata);
 use Perinci::Sub::Util qw(err);
 use Scalar::Util qw(blessed);
-use Module::Path::More qw(module_path);
+use Module::Installed::Tiny qw(module_source);
 use Package::Util::Lite qw(package_exists);
 use Tie::Cache;
 use URI::Split qw(uri_split uri_join);
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 our $re_perl_package =
     qr/\A[A-Za-z_][A-Za-z_0-9]*(::[A-Za-z_0-9][A-Za-z_0-9]*)*\z/;
@@ -245,7 +245,7 @@ sub _load_module {
     # load and cache negative result
     my $res;
     {
-        my $fullpath = module_path(module=>$pkg, find_pmc=>0, find_prefix=>1);
+        my ($source, $fullpath) = module_source($pkg, {die=>0, find_prefix=>1});
 
         # when the module path does not exist, but the package does, we can
         # ignore this error. for example: main, CORE, etc.
@@ -260,13 +260,14 @@ sub _load_module {
             $res = [405, "Can only find a prefix path for package $pkg"];
             last;
         }
-        eval { require $module_p };
+        eval $source;
         if ($@) {
             die if $ENV{PERINCI_ACCESS_SCHEMELESS_DEBUG};
             $res = [500, "Can't load module $pkg (probably compile error): $@"];
             last;
         }
         # load is successful
+        $INC{$module_p} = $fullpath;
         if ($self->{after_load}) {
             eval { $self->{after_load}($self, module=>$pkg) };
             if ($@) {
