@@ -1,3 +1,10 @@
+0.896   2022-08-22  Released-By: PERLANCAR; Urgency: high
+
+        - Update dependency version Module::Installed 0.011.
+
+        - [ux] Show error message from module_source().
+
+
 0.895   2022-06-10  Released-By: PERLANCAR; Urgency: medium
 
         - Replace Module::Path::More with Module::Installed::Tiny to
