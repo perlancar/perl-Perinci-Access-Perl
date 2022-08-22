@@ -245,7 +245,9 @@ sub _load_module {
     # load and cache negative result
     my $res;
     {
-        my ($source, $fullpath) = module_source($pkg, {die=>0, find_prefix=>1});
+        my ($source, $fullpath);
+        eval { ($source, $fullpath) = module_source($pkg, {die=>1, find_prefix=>1}) };
+        my $err = $@;
 
         # when the module path does not exist, but the package does, we can
         # ignore this error. for example: main, CORE, etc.
@@ -253,7 +255,7 @@ sub _load_module {
 
         if (!$fullpath) {
             last if $pkg_exists;
-            $res = [404, "Can't find module or prefix path for package $pkg"];
+            $res = [404, "Can't find module or prefix path for package $pkg: $err"];
             last;
         } elsif ($fullpath !~ /\.pm$/) {
             last if $pkg_exists;
