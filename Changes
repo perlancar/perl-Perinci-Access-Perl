@@ -1,3 +1,11 @@
+0.898   2022-08-25  Released-By: PERLANCAR; Urgency: high
+
+        - Merge releases 0.895 & 0.895.2, 0.896 & 0.896.2.
+
+        - [bugfix] module_source() will return undef for path when source
+          is from a hook.
+
+
 0.896.2 2022-08-22  Released-By: PERLANCAR; Urgency: high
 
         - Update dependency version Module::Installed 0.011.
