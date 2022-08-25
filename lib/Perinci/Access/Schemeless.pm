@@ -253,13 +253,9 @@ sub _load_module {
         # ignore this error. for example: main, CORE, etc.
         my $pkg_exists = package_exists($pkg);
 
-        if (!$fullpath) {
+        if (!defined($source)) {
             last if $pkg_exists;
-            $res = [404, "Can't find module or prefix path for package $pkg: $err"];
-            last;
-        } elsif ($fullpath !~ /\.pm$/) {
-            last if $pkg_exists;
-            $res = [405, "Can only find a prefix path for package $pkg"];
+            $res = [404, "Can't find source for module $pkg".($fullpath && $fullpath !~ /\.pm$/ ? " (but can find prefix for it at $fullpath)" : "").": $err"];
             last;
         }
         eval $source; ## no critic: BuiltinFunctions::ProhibitStringyEval
